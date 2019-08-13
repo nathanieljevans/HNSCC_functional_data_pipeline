@@ -62,4 +62,6 @@ if not os.path.exists('./output/HNSCC_FUNCTIONAL_ASSAY_MAPPED_DOSE_RESPONSE_DATA
 
 data.to_csv('./output/HNSCC_FUNCTIONAL_ASSAY_MAPPED_DOSE_RESPONSE_DATA/HNSCC_funcData_%s.csv' %datetime.today().strftime('%m_%d_%Y'))
 
+distinct_drugs = pd.DataFrame({'inhibitor':data['inhibitor'].unique()}).sort_values(by='inhibitor')
+distinct_drugs.to_csv('./output/unique_drugnames.csv')
 #print( data.groupby(['inhibitor']).size() )

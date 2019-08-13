@@ -54,7 +54,6 @@ if __name__ == '__main__':
             assert df.shape[0] == 7, 'wrong number of doses'
 
             try:
-
                 x = sm.add_constant(np.log10(df['conc'].values))
                 y = df['avg.opt.density'].values
 
@@ -63,7 +62,7 @@ if __name__ == '__main__':
 
                 # AUC calculation -----------------------------------------------------
                 # left rectangle auc estimate
-                delta = 0.01
+                delta = 0.001
                 x2 = np.arange(np.log10(min(df['conc'].values)), np.log10(max(df['conc'].values)), delta)
                 yhat = glm_res.predict(sm.add_constant(x2))
                 auc = np.sum(yhat*delta)
@@ -75,9 +74,11 @@ if __name__ == '__main__':
                 # update results
                 [res[var].append(val) for var,val in zip(['lab_id', 'inhibitor','beta0', 'beta1', 'auc'], [patient, inhib, beta0 ,beta1 , auc])]
 
-
-
             except:
+                plt.figure()
+                plt.plot(df['conc'].values, df['avg.opt.density'].values, 'b-')
+                plt.show()
+
                 failures.append( (patient, inhib) )
                 [res[var].append(val) for var,val in zip(['lab_id', 'inhibitor','beta0', 'beta1', 'auc'], [patient, inhib, 'NA' ,'NA' , 'NA'])]
                 if DIAGNOSTICS:
