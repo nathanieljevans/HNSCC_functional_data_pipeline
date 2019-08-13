@@ -32,7 +32,6 @@ print('loading plate maps from: %s ... ' %map_dir)
 map_data = {}
 for v in os.listdir(map_dir):
     version_id = v[:-5].split('=')[-1]
-    print(v)
     map_data[version_id] = get_plate_map(map_dir + '/' + v)
 print('\n')
 

@@ -82,7 +82,7 @@ def get_plate_data(data_path, verbose=False):
         else:
             dat = dat.assign(plate_row = dat[0]).assign(norm_type = dat[25], plate_num = p+1, lab_id = lab_id, assay_version_id=version_id, note=notes).drop(labels = [0,25], axis='columns')
 
-        dat = pd.melt(dat, id_vars=['lab_id', 'norm_type', 'plate_num', 'plate_row','assay_version_id'], value_vars=None, var_name='plate_col', value_name='optical_density', col_level=None)
+        dat = pd.melt(dat, id_vars=['lab_id', 'norm_type', 'plate_num', 'plate_row','assay_version_id', 'note'], value_vars=None, var_name='plate_col', value_name='optical_density', col_level=None)
 
         plates.append( dat )
         i += 16 + 2 # skip empty row + header

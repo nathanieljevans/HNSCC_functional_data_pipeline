@@ -46,11 +46,15 @@ if __name__ == '__main__':
     for patient in set(data['lab_id'].values):
         pat_dat = data[data['lab_id'] == patient]
         print('Fitting probit | n = %d | lab_id = %s | n_failures = %d' %(i, patient, len(failures) ), end='\r')
+
         for inhib in set(pat_dat['inhibitor'].values):
             i+=1
 
             df = pat_dat[pat_dat['inhibitor'] == inhib]
 
+            print()
+            print('shape: %s' %str(df.shape))
+            print('inhib: %s' %inhib)
             assert df.shape[0] == 7, 'wrong number of doses'
 
             try:
