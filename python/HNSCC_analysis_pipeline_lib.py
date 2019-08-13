@@ -38,7 +38,7 @@ def parse_pathname(path, verbose=False):
 
 
 
-def get_plate_data(data_path, verbose=True):
+def get_plate_data(data_path, verbose=False):
     '''
     each plate has 16 rows of drug data, then a empty row, then the next plate. Varying number of plates
 
@@ -49,7 +49,7 @@ def get_plate_data(data_path, verbose=True):
         dataframe
     '''
 
-    lab_id, norm, version_id = parse_pathname(data_path)
+    lab_id, norm, version_id, notes = parse_pathname(data_path)
 
     if verbose: print('---------------------------------------------------------')
     if verbose: print( 'please double check file name parsing is accurate')
@@ -57,6 +57,7 @@ def get_plate_data(data_path, verbose=True):
     if verbose: print('lab_id: %s' %lab_id)
     if verbose: print('norm: %s' %norm)
     if verbose: print('version_id: %s' %version_id)
+    if verbose: print('notes: %s' %notes)
     if verbose: print('---------------------------------------------------------')
 
     allplates = pd.read_excel(data_path, header=None)
@@ -69,9 +70,18 @@ def get_plate_data(data_path, verbose=True):
 
     plates = []
     i = 1 # skip original header
+    warned = False
     for p in range(int(nplates)):
         dat = pd.DataFrame( allplates.values[i:(i+16),:])
-        dat = dat.assign(plate_row = dat[0]).assign(norm_type = dat[25], plate_num = p+1, lab_id = lab_id, assay_version_id=version_id).drop(labels = [0,25], axis='columns')
+
+        # check for blank490 column ... confidence in proper documentation
+        if dat.shape[1] < 26:
+            if not warned: print('WARNING: This assay [lab_id=%s,notes=%s] does not have a "blank490" column (last col), please double check that the data has been normalized by the positive controls.' %(lab_id,notes))
+            warned = True
+            dat = dat.assign(plate_row = dat[0]).assign(norm_type = 'none', plate_num = p+1, lab_id = lab_id, assay_version_id=version_id, note=notes).drop(labels = [0], axis='columns')
+        else:
+            dat = dat.assign(plate_row = dat[0]).assign(norm_type = dat[25], plate_num = p+1, lab_id = lab_id, assay_version_id=version_id, note=notes).drop(labels = [0,25], axis='columns')
+
         dat = pd.melt(dat, id_vars=['lab_id', 'norm_type', 'plate_num', 'plate_row','assay_version_id'], value_vars=None, var_name='plate_col', value_name='optical_density', col_level=None)
 
         plates.append( dat )

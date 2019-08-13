@@ -52,12 +52,11 @@ Mollys Lab Name?
   - Ashley Anderson (Prior to XXX)
   - Myles ?? 
   - Chase ?? 
-  
 
 
 TODOS 
-  - BioCompute [Object](https://biocomputeobject.org/about.html) 
-  - Dockerize code
+  - BioCompute [Object](https://biocomputeobject.org/about.html) ? 
+  - Dockerize code?
   - ???
 
 # data orginization
@@ -197,8 +196,7 @@ Raw Data: [Tyner Panel HNSCC 490 and blank490 data.xlsx](https://ohsu.app.box.co
 - What is `Blank 490` vs `490` : appears in last column of plate layouts 
     - Blank 490 refers to no cells no drug,   490 refers to cells, no drug  
     
-- need the plate layout for each tyner version 
-- is there a cleaned version of the plate data? eg... ID, inhibitor(s), dose, optical_density... 
+- need the plate layout for each tyner version
 - Has this analysis been done for all the panels? I found the summary sheet for the tyner panels, but not for the HNSCC... what am I comparing too? 
 - The plate positions don't seem randomized... is this another step? do I need to deconvolute it to get the version 1 map? 
 - what the heck are those .xpt files??? not spss, sas or firefox... I don't get it. I believe there the photospectrometer output files.
@@ -261,7 +259,7 @@ single.drug %>% select(inhibitor) %>% unique() %>% mutate(inhibitor = as.charact
 
 ## Normalization 
 
-All our data is has been normalized by the photospectrometer software, indicated by `Blank490` designation. 
+All our data is has been normalized (positive control only) by the photospectrometer software, indicated by `Blank490` designation. 
 
 ## Batch Effects 
 
