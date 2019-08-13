@@ -29,6 +29,8 @@ import numpy as np
 import seaborn as sbn
 from matplotlib import pyplot as plt
 
+pd.options.display.width = 0
+
 # comment this to False - will plot failures
 DIAGNOSTICS = True
 
@@ -39,6 +41,7 @@ if __name__ == '__main__':
     print('Data path: %s' %path)
 
     data = pd.read_csv(path, sep=',')
+    print(data.head())
 
     failures = []
     res = {x:[] for x in ['lab_id', 'inhibitor','beta0', 'beta1', 'auc']}
@@ -55,10 +58,14 @@ if __name__ == '__main__':
             print()
             print('shape: %s' %str(df.shape))
             print('inhib: %s' %inhib)
-            assert df.shape[0] == 7, 'wrong number of doses'
+            assert df.shape[0] % 7 == 0, 'wrong number of doses, must be multiple of 7'
 
             try:
-                x = sm.add_constant(np.log10(df['conc'].values))
+                print(df.head())
+                print(df['conc'].values)
+
+                # 'conc' variables haven't separated combination data yet, so they are stored as strings. 
+                x = sm.add_constant( np.log10( df['conc'].values ))
                 y = df['avg.opt.density'].values
 
                 pr = sm.GLM(y, x, family=sm.families.Binomial(link=sm.families.links.probit()))
@@ -71,6 +78,13 @@ if __name__ == '__main__':
                 yhat = glm_res.predict(sm.add_constant(x2))
                 auc = np.sum(yhat*delta)
 
+                if (DIAGNOSTICS):
+                    plt.figure()
+                    plt.plot(x2, yhat, 'r-', label='probit_fit')
+                    plt.plot(x,y, 'bo', label='replicates')
+                    plt.legend()
+                    plt.show()
+
                 # beta0 = intercept
                 # beta1 = slope
                 (beta0,beta1) = glm_res.params
@@ -79,10 +93,6 @@ if __name__ == '__main__':
                 [res[var].append(val) for var,val in zip(['lab_id', 'inhibitor','beta0', 'beta1', 'auc'], [patient, inhib, beta0 ,beta1 , auc])]
 
             except:
-                plt.figure()
-                plt.plot(df['conc'].values, df['avg.opt.density'].values, 'b-')
-                plt.show()
-
                 failures.append( (patient, inhib) )
                 [res[var].append(val) for var,val in zip(['lab_id', 'inhibitor','beta0', 'beta1', 'auc'], [patient, inhib, 'NA' ,'NA' , 'NA'])]
                 if DIAGNOSTICS:
