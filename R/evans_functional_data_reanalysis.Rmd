@@ -1,0 +1,416 @@
+---
+title: "HNSCC - Dose-Response Re-analysis"
+author: "Nathaniel Evans"
+date: "July 11, 2019"
+output:
+  html_document: 
+    theme: flatly 
+    highlight: kate
+    toc: true
+    toc_depth: 2
+    toc_float : true
+    smooth_scroll: true
+    number_sections : false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(SASxport)
+library(tidyverse)
+library(foreign)
+library(haven)
+```
+
+<details>
+ <summary>Session Information</summary>
+```{r}
+sessionInfo()
+```
+</details>
+
+# overview 
+
+The purpose of this script is to document the HNSCC functional data sources, protocol and pipeline.
+
+IRB protocol: ____
+
+## Roles 
+
+This project is a joint effort between the Biodev lab & ?? 
+
+Biodev lab 
+- Shannon McWeeney: PI 
+- Nate Evans: 
+- Aurora Blucher: 
+- Gabby Choonoo [prior to XXX]
+- Ted Laderas: 
+- James Jacobs 
+- ??? 
+
+Mollys Lab Name? 
+  - Molly XXX 
+  - Ashley Anderson (Prior to XXX)
+  - Myles ?? 
+  - Chase ?? 
+  
+
+
+TODOS 
+  - BioCompute [Object](https://biocomputeobject.org/about.html) 
+  - Dockerize code
+  - ???
+
+# data orginization
+
+All data is located on box, downloaded locally for analysis and stored in ./data/
+
+`Functional & Genomic Data Completion Checklist` - overview of HNSCC func. data| [box](https://ohsu.app.box.com/file/197445469039) | [local](./data/`Functional & Genomic Data Completion Checklist.xlsx`)
+
+
+# HNSCC Protocol 
+
+## HNSCC SPECIFIC PANEL DATA 
+
+Full protocol can be found in [box](https://ohsu.app.box.com/file/491955541227). 
+
+<details>
+ <summary>Protocol Details</summary>
+
+### Protocol:  
+
+1.	Wash cells with PBS to remove serum & media (10mL for one 100mm plate). 100mm confluent plate has approximately 5-10M cells depending on cell size.   
+
+2.	Add 3ml trypsin and incubate at 37C for 10min (3mL for one 100mm plate), stop trypsinization with 10ml medium and pipette the cells up and down against the center of the plate to break up the clumps.  
+
+3.	Filter all the cells into 50mL falcon tube using a sterile cell strainer, add 10mL medium to make the cell density lower and count cells  
+       Cell counting:
+50uL trypan blue + 50uL cell mix well and take 20uL out onto cell counting plate, don't let the cover slip flow or the volume in the chamber changes. Count clear cells (blue cells are dead).   
+Cell density= average cell number in one square*10^4 * total number of mL   
+
+4.	Spin down the cells and add the appropriate volume of base media to get 1million cells per mL of media.  For example if your total cell count is 22.5 million cells add 22.5mL of base media and resuspend, then transfer 5.6mL of cell suspension into 29.4mL of base media to bring final volume to 35mL of media with 5.6 million cells total. You will need two tubes of 35mL with 5.6 million cells to plate all 6 inhibitor plates.  
+
+5.	With the extra cells (if any) plate onto collagen coated coverslips at 100,000 cells per well for evaluation fo cell differentiation by vimentin & keratin immunofluorescence. If any additional left over, viably freeze those cells.   
+
+6.	Put the two tubes on ice & bring to the tyner lab to use the automated plating system. Make sure to bring tubes for washing/cleaning automated plating system in tyner lab (diH2O (2 tubes) , 10% bleach, 70% EtOH, 0.05% Tween 20 in PBS, 1X PBS)   
+
+7.	After plating cells in the tyner lab, incubate the plates for 72hrs.   
+
+8.	Bring whatever cells are leftover from automated plating and put into a new 100mm plate to monitor cell growth & replating efficiency.   
+
+9.	Plate MTS at 5uL per well after 72hrs  
+
+10.	Incubate the MTS for 1-24 hrs as needed for appropriate color change.  
+
+11.	Read plates using the photospectrometer (Pam's lab behind Madelines bench) when color change is sufficient (usually between 1-5 hours but can sometimes be up to 24hrs - make sure to note time of MTS duration at plate reading)  [NOTE: we should be looking for final values in the untreated columns 8, 16 and 24 of between 0.2 and 1.0]  
+
+</details>  
+
+## Inhibitor Assay Version 1 Design Summary
+
+Full summary .docx can be found on [box](https://ohsu.app.box.com/file/163119168882)
+
+<details>
+ <summary> Summary Details </summary>
+
+### Drug List:  
+
+Drugs for version 1 of the HNSCC specific inhibitor assay were determined from analysis of five different measurements.  
+
+#### 1.	INHIBITOR ASSAY'S  
+
+The top 15 drugs from previous inhibitor assays with and without an EGFR inhibitor from 11 patient derived HNSCC tumor cell lines were added. One of which was an HPV+ tumor cell line (10159). Effective drugs were also added based on inhibitor assay analysis of 3 cutaneous SCC patient derived tumor cell lines.  
+
+#### 2.	TCGA HNSCC LIGHT PATHWAY ANALYSIS   
+
+Shannon's group analysis of TCGA HNSCC data set. Aberrational pathways were ranked based on number of a mutations in a certain pathway and frequency of mutations in a given gene. Using Rory's analysis of FDA approved cancer drugs, Rory came up with a list of drugs that best targeted the aberrational pathways of the TCGA HNSCC dataset. For more details see Rory's summary in box.  
+
+#### 3.	RAPID ASSAY'S  
+
+Rapid assay targets below the mean - 2 SD for 11 patient cell derived tumor cell lines were cross referenced to the targets from the drugs curated from the above two analyses. If a target came up from the rapid assay analysis and the TCGA analysis that did not have a drug already listed that hit that target, we used literature searches to determine which drug(s) should be added to the panel for that target.   
+
+#### 4.	TCGA HNSCC DARK PATHWAY ANALYSIS  
+
+Using Gabby's ranking of TCGA dark pathways, Steve created a list of top natural products that would target the dark pathways. In addition to TCGA dark pathways, Steve also looked for natural products that would target p53 or RAS, as they were two targets from the rapid assay that did not have any drugs on the panel targeting them. See Steve's summary in box for more details.   
+
+#### 5.	COMBINATIONS  
+
+Lastly, a few combinations were added to the panel based on data of effective drugs or targets from the inhibitor assay's and rapid assays of 11 patient derived tumor cell lines in combination with an EGFR inhibitor. Most of these were combinations of drugs with the EGFR inhibitor, Gefitinib, and a few were other drugs in combination with a PI3K/mTOR inhibitor, BEZ235.  
+
+After curation using the four methods above, drugs for a few other targets of interest were added. This included BRD4 inhibitors and their combination with Gefitinib and BEZ235.   
+
+### Plate Layout:  
+
+After all analyses above were completed, the position of the drug on each plate was randomized by Rory and Shannon. The randomization took into account x, x, x.  ???
+
+Plate layout design was based on design of Tyner panel where starting concentration of drug's were added (1 to each well, going down the column) of column 1, 9, and 17. Columns 8, 16, and 24 were blanks and just included DMSO. Then 7, 3-fold serial dilutions were plated across the plate from columns 1-7, 9-15, and 17-23. Total volume in each well was 60uL. Starting concentrations of drugs were determined from previous use on Tyner panel. For new drugs not tested on Tyner panel, the starting concentrations were all 10mM (for master plate but final concentration will be 10nM on daughter plates after addition of cells) to test for initial version but can be adjusted for future versions.   
+
+### Drug Dilutions:  
+
+All drugs were diluted to 20mM unless otherwise stated on vial due to solubility difficulties. All drugs were diluted in DMSO, aside from Pemetrexed which was dissolved in DMEM/F12 media due to insolubility in DMSO. Drugs were organized in alphabetical order and placed in boxes in the -80 closest to the BSL2 back room of the equipment room.   
+
+### Plate Making:  
+
+Plates were made 1 day at a time for three consecutive days from 4/19-4/21 2017. All drugs were thawed in 37degreeC metal bead bath and vortexed prior to adding to the plate. For drugs at 20mM concentration, 30uL of DMSO was added to the well first, followed by 30uL of the drug. For drugs at other various concentrations, this was adjusted accordingly. All drugs were added to columns 1, 9, and 17. Then 40uL of DMSO was added to all other empty wells. Next, 7 three-fold serial dilutions were plated across the columns, picking up 20uL from first column and mixing up and down 5 times before transferring to next well. Lastly, DMSO was removed from wells 8H and 16H, and positive controls (flavopiridol + staurosporine + velcade) were added instead. Plates were covered with plate cover sticker/microseal Biorad type B) and spun down at 2,000RPM for 30 seconds before placing directly in -80 freezer. Plates were transferred to Dylan Nelson (OTRADI, OSU) on dry ice on 4/21/2017 for making the daughter plates.   
+
+Dylan creates three master plates from the original master plate (for purposes of avoiding repetitive freeze thaw cycles based on the number of plates we order at one time) and each of these is used to create 20 daughter plates by aliquoting 46nL from each of the master wells into 23uL of base media. These plates are then delivered on dry ice back to our lab and stored in the -20 freezer until use. The plates are thawed and 25uL of base media + cells is added to each well using the automated plating equipment in the Tyner laboratory.   
+
+</details> 
+
+## photospectrometer details 
+
+Synergy|H1 microplate reader 
+
+Serial Number: ____ 
+
+Documentation: [overview](https://www.biotek.com/products/detection-hybrid-technology-multi-mode-microplate-readers/synergy-h1-hybrid-multi-mode-reader/technical-details/)
+
+Software: [link](https://www.biotek.com/products/detection-hybrid-technology-multi-mode-microplate-readers/synergy-h1-hybrid-multi-mode-reader/software/)
+
+
+# Data Dictionary 
+
+## Relevant Terms 
+
+> `Blank 490`     the 490nm reading that has been adjusted based on the blank wells (wells with no drug) - the software does this computation automatically. 
+> `490`           490nm is the same thing only not blanked to the wells with no drugs 
+
+
+## HNSCC SPECIFIC PANEL DATA  
+
+HNSCC Cases-HNSCC Specific Inhibitor Assays [Plate data](https://ohsu.app.box.com/folder/32196611314)
+
+HNSCC version 1 plate [layout](https://ohsu.app.box.com/file/162065217395)
+
+TYNER PANELS DATA 
+[tyner panel data](https://ohsu.app.box.com/folder/32196592439)
+
+Summary: [10004-10250 Inhibitor assay Jeff panel IC50s for Shannon 7.14.2017.xlsx](https://ohsu.app.box.com/file/197419371743)  
+
+Raw Data: [Tyner Panel HNSCC 490 and blank490 data.xlsx](https://ohsu.app.box.com/file/288698914365)  
+
+
+## 
+
+
+# standing questions 
+
+- What is `Blank 490` vs `490` : appears in last column of plate layouts 
+    - Blank 490 refers to no cells no drug,   490 refers to cells, no drug  
+    
+- need the plate layout for each tyner version 
+- is there a cleaned version of the plate data? eg... ID, inhibitor(s), dose, optical_density... 
+- Has this analysis been done for all the panels? I found the summary sheet for the tyner panels, but not for the HNSCC... what am I comparing too? 
+- The plate positions don't seem randomized... is this another step? do I need to deconvolute it to get the version 1 map? 
+- what the heck are those .xpt files??? not spss, sas or firefox... I don't get it. I believe there the photospectrometer output files.
+- What method does the photospectrometer program use to normalize (by controls)? (eg `Blank490`). How does it know which wells are controls? 
+- Can we use DMSO wells as controls as well? 
+
+# process raw
+
+run this in terminal 
+
+```
+
+HNSCC_plate_data_mapper.py ./data/HNSCC_plate_maps ./data/HNSCC_function_assay_data-7_18_2019--RENAMED
+
+```
+## EDA 
+
+# data in
+
+```{r}
+
+hnscc.inhib <- read.csv2('./HNSCC_FUNCTIONAL_ASSAY_MAPPED_DOSE_RESPONSE_DATA/HNSCC_funcData_07_18_2019.csv', as.is=T, header=T, sep=',')
+
+hnscc.inhib %>% head() 
+
+```
+
+
+```{r}
+hnscc.inhib %>% glimpse()
+```
+
+```{r}
+hnscc.inhib %>% group_by(inhibitor) %>% count()
+```
+
+```{r}
+
+single.drug <- hnscc.inhib %>% filter(!grepl(';', conc)) %>% mutate(inhibitor=as.factor(inhibitor), conc=as.numeric(conc), optical_density=as.numeric(optical_density), lab_id=as.factor(lab_id), plate_num=as.factor(plate_num))
+
+single.drug %>% head()
+
+single.drug %>% nrow()
+
+```
+
+```{r}
+
+single.drug %>% group_by(lab_id, inhibitor) %>% count() %>% arrange(desc(n)) %>% mutate(assays = n/7)
+
+```
+
+```{r}
+
+single.drug %>% select(inhibitor) %>% unique() %>% mutate(inhibitor = as.character(inhibitor)) %>% arrange(inhibitor)
+
+```
+
+# QUALITY CONTROL 
+
+## Normalization 
+
+All our data is has been normalized by the photospectrometer software, indicated by `Blank490` designation. 
+
+## Batch Effects 
+
+Potential batch effects: 
+  - Plate Number 
+  - Assay Number 
+  - Well location (plate_col, plate_row)
+  - Date (where can I get this information)
+  - MTS incubation time (varied, info should be listed in checklist excel)
+  - compare DMSO vs Controls 
+  - compare repeated drugs (6 per panel, same location, drug and conc on each plate)
+
+```{r}
+
+single.drug %>% mutate(is.control = ifelse(as.character(inhibitor)=='NONE', T, F)) %>% group_by(is.control) %>% ggplot(aes(x=plate_num, y=optical_density, fill=is.control)) + geom_boxplot()
+
+```
+
+```{r}
+
+single.drug %>% mutate(is.control = ifelse(as.character(inhibitor)=='NONE', T, F)) %>% group_by(is.control) %>% ggplot(aes(x=lab_id, y=optical_density, fill=is.control)) + geom_boxplot()
+
+```
+
+```{r}
+
+single.drug %>% mutate(is.control = ifelse(as.character(inhibitor)=='NONE', T, F)) %>% group_by(is.control) %>% ggplot(aes(x=plate_row, y=optical_density, fill=is.control)) + geom_boxplot()
+
+single.drug %>% mutate(is.control = ifelse(as.character(inhibitor)=='NONE', T, F)) %>% group_by(is.control) %>% ggplot(aes(x=as.factor(plate_col), y=optical_density, fill=is.control)) + geom_boxplot()
+
+```
+
+```{r}
+
+single.drug %>% filter(inhibitor %in% c('NONE', 'DMSO')) %>% ggplot(aes(x=inhibitor, y=optical_density)) + geom_boxplot()
+
+```
+
+```{r}
+
+single.drug %>% filter(inhibitor == 'F-S-V') %>% ggplot(aes(x=plate_num, y=optical_density)) + geom_boxplot() + ggtitle('Positive Controls')
+
+```
+
+```{r}
+
+# names are slightly different in plates 1-3 ??? Need list of all drugs on panel
+
+`%nin%` = Negate(`%in%`)
+
+single.drug %>% filter(lab_id == '10004') %>% filter(plate_row %in% c('H', 'I')) %>% filter(inhibitor %nin% c('NONE','F-S-V')) %>% ggplot(aes(x=log10(conc), y=optical_density, color=as.factor(plate_num))) + geom_point() + ggtitle('plate replicates') + facet_wrap(~inhibitor)
+
+```
+
+
+## Quality Control 
+
+
+## normalize optical density ??? 
+
+## basement + ceiling 
+
+is.adj <boolean> True if adjusted by ceiling/basement [0,1]
+
+```{r}
+single.drug %>% head()
+
+single.drug.pp1 <- single.drug %>% mutate(is.adj = ifelse(optical_density > 1 | optical_density < 0, T, F), optical_density = pmax( pmin(optical_density, 1.0), 0.0) )
+
+single.drug.pp1 %>% group_by(is.adj) %>% count()
+
+single.drug.pp1 %>% head()
+
+```
+
+## calculate AUC 
+
+
+
+```{r}
+
+avg.single.drug.cv <- single.drug.pp1 %>% select(lab_id, inhibitor, conc, optical_density) %>% group_by(lab_id, inhibitor, conc) %>% mutate(avg.opt.density = mean(optical_density)) %>% ungroup()
+
+avg.single.drug.cv %>% head(10) 
+
+#avg.single.drug.cv %>% filter( is.na(avg.opt.density) ) %>% count()
+
+# these examples had only 1 observation in some cases 
+avg.single.drug.cv <- avg.single.drug.cv %>% filter(inhibitor %nin% c('DMSO', 'DMSO ', 'F-S-V', 'NONE'))
+
+avg.single.drug.cv %>% select(-optical_density) %>% unique() %>% group_by(lab_id, inhibitor) %>% count() %>% ungroup() %>% filter(n != 7) %>% select(-lab_id) %>% unique()
+
+
+
+```
+
+```{r}
+test <- avg.single.drug.cv %>% arrange(inhibitor, lab_id) %>% filter(lab_id=='10004', inhibitor=='Gefitinib')
+test
+
+test %>% ggplot(aes(x=log10(conc), y=avg.opt.density, color='avg')) + geom_point(aes(x=log10(conc), y=optical_density, color='replicates')) + geom_point() + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) 
+
+
+probit <- test %>% glm((avg.opt.density) ~ log10(conc), family=binomial(link="probit"), data=.) 
+
+probit$coefficients
+
+beta0 <- probit$coefficients[[1]]
+beta1 <- probit$coefficients[[2]]
+
+beta0
+beta1
+```
+
+THIS ISN"T WORKING - just going to do it in python 
+
+```{r}
+
+avg.single.drug.cv %>% head()
+
+single.drug.res <- avg.single.drug.cv %>% select(-optical_density) %>% unique() %>% write.csv(x=., file='./data/single_drugs_for_prob_calc.csv', sep=',', row.names=F) 
+  
+  #group_by(lab_id, inhibitor) %>% mutate(probit.beta0 = suppressWarnings(glm(avg.opt.density ~ log10(conc), family=binomial(link="probit"), data=.)$coefficients[[1]]), probit.beta1 = suppressWarnings(glm(avg.opt.density ~ log10(conc), family=binomial(link="probit"), data=.)$coefficients[[2]])) 
+
+#single.drug.res %>% head()
+
+```
+
+
+```{r}
+
+single.drug.res %>% ungroup() %>% select(lab_id, inhibitor, probit.beta0, probit.beta1) %>% unique() %>% head(10)
+
+```
+
+```{r}
+
+probit.res <- read.csv2('./data/single_drug_probit_fit_results.csv', sep=',', header=T, as.is=T) %>% mutate(auc=as.numeric(auc))
+
+probit.res %>% head()
+
+probit.res %>% ggplot(aes(x=auc)) + geom_density()
+
+probit.res %>% group_by(inhibitor) %>% count() %>% arrange(desc(n))
+
+probit.res %>% summary()
+```
+
+
+
+
+
