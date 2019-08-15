@@ -15,6 +15,7 @@ from datetime import datetime as dt
 from matplotlib import pyplot as plt
 import seaborn as sbn
 import statsmodels.api as sm
+import statsmodels
 
 pd.options.display.width = 0
 
@@ -334,19 +335,22 @@ class panel:
         fitdat = self.data[~self.data['inhibitor'].isin(['NONE', 'F-S-V', 'DMSO'])]
 
         if method == 'within':
+            avgd_obs = []
             self._log('averaging within plate replicates...')
+
             for plate in set(fitdat['plate_num'].values):
                 platedat = fitdat[fitdat['plate_num'] == plate]
 
                 for inhib in set(platedat['inhibitor'].values):
                     assay = platedat[platedat['inhibitor'] == inhib]
 
-                    #print('assay shape: %s' %str(assay.shape))
                     if assay.shape[0] > 7:
-                        #print('assay shape: %s' %str(assay.shape))
-                        #print(assay[])
                         n+=1
                         replicates.append(inhib)
+
+                        new_obs = assay.groupby(['lab_id','inhibitor','conc_norm', 'plate_num'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm', 'plate_num'])
+
+                        avgd_obs.append(new_obs)
 
                         aucs = []
                         # groupby row - TODO: should double check that no replicates are on same row
@@ -357,8 +361,19 @@ class panel:
 
                         if max(aucs) - min(aucs) > flag_threshold: toflag.append(inhib)
 
-            self._log('There were %d within plate replicates [%r]' %(n, replicates)))
+            self._log('There were %d within plate replicates [%r]' %(n, replicates))
             self._log('within plate replicates flagged: %r' %toflag)
+
+            if len(replicates) > 0:
+                # set is_repl flag, signifies that it has been averaged
+                repls = pd.DataFrame({'inhibitor': replicates, 'is_within_plate_repl': [True]*len(replicates)})
+                self.data = self.data.merge(repls, how='left', on='inhibitor').assign(is_within_plate_repl = lambda x: [True if f else False for f in x.is_within_plate_repl])
+                # then add the averaged replicate observation to the bottom of dataframe
+                for nobs in avgd_obs:
+                    self.data = self.data.append(nobs, ignore_index=True)
+
+            else:
+                self.data = self.data.assign(is_within_plate_repl = False)
 
             # add auc diff flag for removal
             if (len(toflag) > 0):
@@ -367,11 +382,11 @@ class panel:
             else:
                 self.data.assign(within_plate_repl_flag = False)
 
-
-
+        # ------------- Across plate replicate averaging VVV ------------------
 
         elif method == 'across':
             self._log('averaging across plate replicates...')
+            avgd_obs = []
 
             for inhib in set(fitdat['inhibitor'].values):
                 assay = fitdat[fitdat['inhibitor'] == inhib]
@@ -381,6 +396,10 @@ class panel:
                     n+=1
                     replicates.append(inhib)
 
+                    new_obs = assay.groupby(['lab_id','inhibitor','conc_norm'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm'])
+
+                    avgd_obs.append(new_obs)
+
                     aucs = []
                     # groupby row - TODO: should double check that no replicates are on same row
                     for plate in set(assay.plate_num):
@@ -388,19 +407,27 @@ class panel:
 
                         aucs.append(self._get_lin_auc(repl))
 
+                    self._log('[%s] linear AUCs: %r -- range (%.2f, %.2f)' %(inhib, aucs, min(aucs), max(aucs)))
                     if max(aucs) - min(aucs) > flag_threshold: toflag.append(inhib)
 
             self._log('There were %d across plate replicates [%r]' %(n, replicates))
             self._log('across plate replicates flagged: %r' %toflag)
 
+            if len(replicates) > 0:
+                # set is_repl flag, signifies that it has been averaged
+                repls = pd.DataFrame({'inhibitor': replicates, 'is_across_plate_repl': [True]*len(replicates)})
+                self.data = self.data.merge(repls, how='left', on='inhibitor').assign(is_across_plate_repl = lambda x: [True if f else False for f in x.is_across_plate_repl])
+                # then add the averaged replicate observation to the bottom of dataframe
+                for nobs in avgd_obs:
+                    self.data = self.data.append(nobs, ignore_index=True)
+            else:
+                self.data = self.data.assign(is_across_plate_repl = False)
+
             if (len(toflag) > 0):
                 flags = pd.DataFrame({'inhibitor': toflag, 'across_plate_repl_flag': [True]*len(toflag)})
-                self.data = self.data.merge(flags, how='left', by='inhibitor').assign(across_plate_repl_flag = lambda x: [True if f else False for f in x.withinplate_repl_flag])
+                self.data = self.data.merge(flags, how='left', on='inhibitor').assign(across_plate_repl_flag = lambda x: [True if f else False for f in x.withinplate_repl_flag])
             else:
                 self.data.assign(across_plate_repl_flag = False)
-
-            # average across plate replicates that don't have flag
-            self.data.groupby(['inhibitor']).mean()[] # <<<<<------------------------ AHHHHH I Don't know how to do this partttt
 
         else:
             raise 'choose a proper averaging method [within, across] plates'
@@ -419,11 +446,10 @@ class panel:
         '''
         assert df.shape[0] == 7, 'There should only be 7 observations per replicate'
 
-        # 'conc' variables haven't separated combination data yet, so they are stored as strings.
-        print()
-        print(df[['inhibitor','conc', 'cell_viab', 'plate_num', 'plate_row', 'plate_col']])
+        #print()
+        #print(df[['inhibitor','conc_norm', 'cell_viab', 'plate_num', 'plate_row', 'plate_col']])
 
-        x = [np.log10(x) for x in df['conc'].values]
+        x = [np.log10(x) for x in df['conc_norm'].values]
         y = df['cell_viab'].values
 
         pr = sm.GLM(y, sm.add_constant(x))
@@ -432,7 +458,7 @@ class panel:
         # AUC calculation -----------------------------------------------------
         # left rectangle auc estimate
         delta = 0.001
-        x2 = np.arange(np.log10(min(df['conc'].values)), np.log10(max(df['conc'].values)), delta)
+        x2 = np.arange(np.log10(min(df['conc_norm'].values)), np.log10(max(df['conc_norm'].values)), delta)
         yhat = glm_res.predict(sm.add_constant(x2))
         auc = np.sum(yhat*delta)
 
@@ -488,13 +514,26 @@ class panel:
         outputs
             none
         '''
+        self._log('fitting probit regressions...')
 
         failures = []
-        res = {x:[] for x in ['lab_id', 'inhibitor','intercept', 'beta1', 'auc']}
+        res = {x:[] for x in ['lab_id', 'inhibitor','intercept', 'beta1', 'auc', 'prob_conv']}
         i = 0
 
-        pat_dat = self.data[self.data['inhibitor'] != 'NONE']
-        pat_dat = pat_dat[fitdat['inhibitor'] != 'F-S-V']
+        # Filter controls
+        pat_dat = self.data[~self.data['inhibitor'].isin(['NONE', 'F-S-V', 'DMSO'])]
+
+        # check
+        #print('----------------------------------------------------')
+        #who = pat_dat[~pat_dat['is_across_plate_repl'].isin([True, False])]
+        #print(who)
+        #print('----------------------------------------------------')
+
+        # Filter replicates that have been averaged into new observation
+        pat_dat = pat_dat[pat_dat['is_across_plate_repl'] != True]
+        pat_dat = pat_dat[pat_dat['is_within_plate_repl'] != True]
+
+        self._log('number of assays to fit: %d' %pat_dat.shape[0])
 
         for inhib in set(pat_dat['inhibitor'].values):
             i+=1
@@ -507,25 +546,22 @@ class panel:
             assert df.shape[0] == 7, 'should have exactly 7 doses! [has %d]' %df.shape[0]
 
             try:
-                print(df.head(7))
-                print(df['conc'].values)
+                x = np.log10( df['conc_norm'].values )
+                y = df['cell_viab'].values
 
-                # 'conc' variables haven't separated combination data yet, so they are stored as strings.
-                x = sm.add_constant( np.log10( df['conc'].values ))
-                y = df['avg.opt.density'].values
-
-                pr = sm.GLM(y, x, family=sm.families.Binomial(link=sm.families.links.probit()))
+                pr = sm.GLM(y, sm.add_constant(x), family=sm.families.Binomial(link=sm.families.links.probit()))
                 glm_res = pr.fit(disp=False)
 
                 # AUC calculation -----------------------------------------------------
                 # left rectangle auc estimate
                 delta = 0.001
-                x2 = np.arange(np.log10(min(df['conc'].values)), np.log10(max(df['conc'].values)), delta)
+                x2 = np.arange(np.log10(min(df['conc_norm'].values)), np.log10(max(df['conc_norm'].values)), delta)
                 yhat = glm_res.predict(sm.add_constant(x2))
                 auc = np.sum(yhat*delta)
 
                 if (plot):
-                    plt.figure()
+                    plt.subplots(1,1, figsize=(10,10))
+                    plt.title('inhib: %s [AUC= %.2f]' %(inhib, auc))
                     plt.plot(x2, yhat, 'r-', label='probit_fit')
                     plt.plot(x, y, 'bo', label='replicates')
                     plt.legend()
@@ -536,21 +572,45 @@ class panel:
                 (intercept,beta1) = glm_res.params
 
                 # update results
-                [res[var].append(val) for var,val in zip(['lab_id', 'inhibitor','intercept', 'beta1', 'auc'], [patient, inhib, beta0 ,beta1 , auc])]
+                [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc', 'prob_conv'], [inhib, intercept ,beta1 , auc, True])]
+
+            except statsmodels.tools.sm_exceptions.PerfectSeparationError as e:
+                '''
+                Perfect separation occurs when all cell_viab values are identical.
+                This most commonly occurs with cell_viab = 1
+                '''
+                self._log('Perfect separation has occured during probit fitting [%s]\n\t cell_viab values: %r' %(inhib, df['cell_viab'].values))
+                cv = df['cell_viab'].unique()
+                #assert len(cv) == 1, 'perfect separation has occured, however, there are multiple cell_viab values. Please investigate issue.'
+
+                if (len(cv) == 1):
+                    self._log('cell_viab values identical; AUC will be calculated by conc-range * cell_viab')
+                    cv = cv[0]
+                    auc = cv * (np.log10(max(df['conc_norm'])) - np.log10(min(df['conc_norm'])))
+                else:
+                    self._log('cell_viab values non-identical; AUC valule will be calculated by linear regression.')
+                    auc = self._get_lin_auc(df, plot=plot)
+
+                [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc', 'prob_conv'], [inhib, None, None, auc, False])]
 
             except:
-                failures.append( (patient, inhib) )
-                [res[var].append(val) for var,val in zip(['lab_id', 'inhibitor','beta0', 'beta1', 'auc'], [patient, inhib, 'NA' ,'NA' , 'NA'])]
+                print('some other exception...')
+                failures.append( inhib )
+                [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc'], [inhib, 'NA' ,'NA' , 'NA'])]
                 if plot:
-                    print('FAILURE: %s, %s' %(patient, inhib))
+                    print('----------------------------------------------------')
+                    print('FAILURE: %s' %inhib)
                     print(df.head(7))
+                    print('----------------------------------------------------')
+
 
                     f, ax = plt.subplots(1,1, figsize = (10,10))
-                    ax.set_title('FAILURE: %s, %s' %(patient, inhib))
+                    ax.set_title('FAILURE: %s' %(inhib))
                     #sbn.scatterplot(x=x2, y=yhat , ax=ax)
                     plt.xscale('log')
-                    sbn.scatterplot(x=np.log10(df['conc'].values), y=df['avg.opt.density'].values, ax=ax)
+                    sbn.scatterplot(x=x, y=y, ax=ax)
                     plt.show()
+                raise
 
         print('Failures [%d]: %r' %(len(failures),failures))
 
