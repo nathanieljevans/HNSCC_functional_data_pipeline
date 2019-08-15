@@ -16,6 +16,8 @@ from matplotlib import pyplot as plt
 import seaborn as sbn
 import statsmodels.api as sm
 import statsmodels
+import os
+import shutil
 
 pd.options.display.width = 0
 
@@ -238,7 +240,7 @@ class panel:
 
         '''
         if self.verbose: print(msg)
-        self.msg_log += str(dt.now()) + ': ' + msg + '\n'
+        self.msg_log += '>> ' + str(dt.now()) + ': ' + msg + '\n'
 
     def map_data(self):
         '''
@@ -264,7 +266,7 @@ class panel:
         self.data = self.data.assign(iscomb= [';' in str(conc) for conc in self.data['conc']])
 
         self.data = self.data.assign(conc_norm = [ [np.sqrt(np.sum(float(y)**2 for y in str(x).split(';')))].pop() for x in self.data['conc']])
-        print(self.data.head(25))
+
 
     def normalize_cell_viability_by_negative_controls(self):
         '''
@@ -289,8 +291,6 @@ class panel:
         # set a flag for low_pac (0.03)
         self.data = self.data.assign(low_PAC_flag = self.data.PAC < 0.03)
 
-        #print(self.data[['lab_id', 'optical_density', 'cell_viab', 'PAC']].head())
-
     def set_floor(self):
         '''
         There is still some contention here, Dan's protocol shifts the PAC up by the smallest value on plate.
@@ -299,10 +299,7 @@ class panel:
         I don't think that's a good idea though, rather, I'm going to round any negatives up to 0. These will be marked with 'is_adj'
         FOR NOW - talk to the group
         '''
-
         self.data = self.data.assign(is_adj = self.data.cell_viab < 0, cell_viab = [0 if cv < 0 else cv for cv in self.data.cell_viab] )
-
-        print(self.data[['lab_id', 'optical_density', 'cell_viab', 'PAC']].head(25))
 
     def avg_plate_replicates(self, method=['within','across'], flag_threshold = 1):
         '''
@@ -387,6 +384,7 @@ class panel:
         elif method == 'across':
             self._log('averaging across plate replicates...')
             avgd_obs = []
+            replicates = []
 
             for inhib in set(fitdat['inhibitor'].values):
                 assay = fitdat[fitdat['inhibitor'] == inhib]
@@ -395,9 +393,7 @@ class panel:
                 if assay.shape[0] > 7:
                     n+=1
                     replicates.append(inhib)
-
                     new_obs = assay.groupby(['lab_id','inhibitor','conc_norm'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm'])
-
                     avgd_obs.append(new_obs)
 
                     aucs = []
@@ -407,7 +403,7 @@ class panel:
 
                         aucs.append(self._get_lin_auc(repl))
 
-                    self._log('[%s] linear AUCs: %r -- range (%.2f, %.2f)' %(inhib, aucs, min(aucs), max(aucs)))
+                    self._log('[%s] linear AUCs: %r -- range: (%.2f, %.2f)' %(inhib, aucs, min(aucs), max(aucs)))
                     if max(aucs) - min(aucs) > flag_threshold: toflag.append(inhib)
 
             self._log('There were %d across plate replicates [%r]' %(n, replicates))
@@ -416,10 +412,11 @@ class panel:
             if len(replicates) > 0:
                 # set is_repl flag, signifies that it has been averaged
                 repls = pd.DataFrame({'inhibitor': replicates, 'is_across_plate_repl': [True]*len(replicates)})
-                self.data = self.data.merge(repls, how='left', on='inhibitor').assign(is_across_plate_repl = lambda x: [True if f else False for f in x.is_across_plate_repl])
+                self.data = self.data.merge(repls, how='left', on='inhibitor')
+                self.data = self.data.assign(is_across_plate_repl = lambda x: [False if f != True else True for f in x.is_across_plate_repl])
                 # then add the averaged replicate observation to the bottom of dataframe
                 for nobs in avgd_obs:
-                    self.data = self.data.append(nobs, ignore_index=True)
+                    self.data = self.data.append(nobs, ignore_index=True, sort=False)
             else:
                 self.data = self.data.assign(is_across_plate_repl = False)
 
@@ -432,8 +429,7 @@ class panel:
         else:
             raise 'choose a proper averaging method [within, across] plates'
 
-
-    def _get_lin_auc(self, df, plot=False):
+    def _get_lin_auc(self, df, plot=False, return_fig=False):
         '''
         fit a linear regression to the data and calculate auc
 
@@ -462,14 +458,18 @@ class panel:
         yhat = glm_res.predict(sm.add_constant(x2))
         auc = np.sum(yhat*delta)
 
-        if plot:
-            plt.figure()
-            plt.plot(x, y, 'ro', label='replicate')
-            plt.plot(x2, yhat, 'g-', label='fit')
-            plt.legend()
-            plt.show()
+        plt.gcf()
+        f = plt.figure(figsize = (10,10))
+        plt.title('Linear Regression [AUC=%.2f]' %auc)
+        plt.plot(x, y, 'ro', label='replicate')
+        plt.plot(x2, yhat, 'g-', label='fit')
+        plt.legend()
+        if plot: plt.show()
 
-        return auc
+        if return_fig: return auc, f
+        else:
+            plt.close(f)
+            return auc
 
     def set_ceiling(self):
         '''
@@ -523,26 +523,20 @@ class panel:
         # Filter controls
         pat_dat = self.data[~self.data['inhibitor'].isin(['NONE', 'F-S-V', 'DMSO'])]
 
-        # check
-        #print('----------------------------------------------------')
-        #who = pat_dat[~pat_dat['is_across_plate_repl'].isin([True, False])]
-        #print(who)
-        #print('----------------------------------------------------')
-
         # Filter replicates that have been averaged into new observation
         pat_dat = pat_dat[pat_dat['is_across_plate_repl'] != True]
         pat_dat = pat_dat[pat_dat['is_within_plate_repl'] != True]
 
-        self._log('number of assays to fit: %d' %pat_dat.shape[0])
+        ntofit = int(pat_dat.shape[0] / 7)
+        self._log('number of assays to fit: %d' %ntofit)
+
 
         for inhib in set(pat_dat['inhibitor'].values):
+            if i%1==0: print('Progress: %.1f%% \t[%d/%d]' %(i/ntofit*100, i, ntofit), end='\r')
             i+=1
 
             df = pat_dat[pat_dat['inhibitor'] == inhib]
 
-            print()
-            print('shape: %s' %str(df.shape))
-            print('inhib: %s' %inhib)
             assert df.shape[0] == 7, 'should have exactly 7 doses! [has %d]' %df.shape[0]
 
             try:
@@ -559,13 +553,17 @@ class panel:
                 yhat = glm_res.predict(sm.add_constant(x2))
                 auc = np.sum(yhat*delta)
 
-                if (plot):
-                    plt.subplots(1,1, figsize=(10,10))
-                    plt.title('inhib: %s [AUC= %.2f]' %(inhib, auc))
-                    plt.plot(x2, yhat, 'r-', label='probit_fit')
-                    plt.plot(x, y, 'bo', label='replicates')
-                    plt.legend()
-                    plt.show()
+                plt.gcf()
+                f, ax = plt.subplots(1,1, figsize=(10,10))
+                plt.title('inhib: %s [AUC= %.2f]' %(inhib, auc))
+                plt.plot(x2, yhat, 'r-', label='probit_fit')
+                plt.plot(x, y, 'bo', label='replicates')
+                plt.legend()
+
+                if plot: plt.show()
+
+                self._save_plot(f, inhib)
+                plt.close(f)
 
                 # beta0 = intercept
                 # beta1 = slope
@@ -589,7 +587,9 @@ class panel:
                     auc = cv * (np.log10(max(df['conc_norm'])) - np.log10(min(df['conc_norm'])))
                 else:
                     self._log('cell_viab values non-identical; AUC valule will be calculated by linear regression.')
-                    auc = self._get_lin_auc(df, plot=plot)
+                    auc, f = self._get_lin_auc(df, plot=plot, return_fig=True)
+                    self._save_plot(f, inhib)
+                    plt.close('all')
 
                 [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc', 'prob_conv'], [inhib, None, None, auc, False])]
 
@@ -598,12 +598,6 @@ class panel:
                 failures.append( inhib )
                 [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc'], [inhib, 'NA' ,'NA' , 'NA'])]
                 if plot:
-                    print('----------------------------------------------------')
-                    print('FAILURE: %s' %inhib)
-                    print(df.head(7))
-                    print('----------------------------------------------------')
-
-
                     f, ax = plt.subplots(1,1, figsize = (10,10))
                     ax.set_title('FAILURE: %s' %(inhib))
                     #sbn.scatterplot(x=x2, y=yhat , ax=ax)
@@ -612,7 +606,30 @@ class panel:
                     plt.show()
                 raise
 
-        print('Failures [%d]: %r' %(len(failures),failures))
+        print()
+        self._log('Failures [%d]: \n\t%r' %(len(failures),failures))
+
+    def _save_plot(self, fig, inhibitor,output_dir='../output'):
+        '''
+
+        '''
+        dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
+        if not os.path.exists(dirout):
+            self._log('creating dose response curve plot directory: %s' %dirout)
+            os.makedirs(dirout)
+
+        if os.path.exists(dirout + '/dose-response-plots/'): shutil.rmtree(dirout + '/dose-response-plots/')
+        os.makedirs(dirout + '/dose-response-plots/' + inhibitor)
+        fig.savefig('%s/dose-response-plots/%s/dose-response-curve.PNG' %(dirout, inhibitor))
+        plt.close(fig)
+
+    def write_log(self, output_dir='../output'):
+        '''
+
+        '''
+        dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
+        with open(dirout + '/output.logs', 'w') as f:
+            f.write(self.msg_log)
 
 
 if __name__ == '__main__':
@@ -621,15 +638,27 @@ if __name__ == '__main__':
     plate_path = '../data/lab_id=10004-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx'
     platemap_dir = '../plate_maps/'
 
-    p = panel(plate_path=plate_path, platemap_dir = platemap_dir, verbose=True)
+    print('initializing panel...')
+    p = panel(plate_path=plate_path, platemap_dir = platemap_dir, verbose=False)
+    print('mapping data...')
     p.map_data()
+    print('normalizing combination agent concentrations...')
     p.normalize_combinationagent_concentrations()
+    print('normalizing cell viability by negative controls...')
     p.normalize_cell_viability_by_negative_controls()
+    print('setting floor of zero...')
     p.set_floor()
+    print('averaging within plate replicates...')
     p.avg_plate_replicates(method='within', flag_threshold=1)
+    print('averaging across plate replicates...')
     p.avg_plate_replicates(method='across', flag_threshold=0.75)
+    print('setting ceiling of 1...')
     p.set_ceiling()
-    p.fit_regressions()
+    print('fitting dose response curve...')
+    p.fit_regressions(plot=False)
+    print('writing logs to file...')
+    p.write_log()
+    print('complete.')
 
 
     #print(p.msg_log)

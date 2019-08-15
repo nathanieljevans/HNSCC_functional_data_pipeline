@@ -3,4 +3,4 @@
 /data/*.txt
 
 # local output is trivial 
-/output/.*
+/output/
