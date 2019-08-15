@@ -1,5 +1,5 @@
 # Data is proprietary and protected, do not upload to github unless given express permission
-./data/*
+/data/*
 
 # local output is trivial 
-./output/*
+/output/*
