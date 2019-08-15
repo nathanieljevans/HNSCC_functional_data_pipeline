@@ -14,7 +14,6 @@ Run the file by
 
 results are saved to ./data/single_drug_probit_fit_results.csv
 
-
 TODO
 - Perfect separation fails, need work around
 
@@ -64,7 +63,7 @@ if __name__ == '__main__':
                 print(df.head())
                 print(df['conc'].values)
 
-                # 'conc' variables haven't separated combination data yet, so they are stored as strings. 
+                # 'conc' variables haven't separated combination data yet, so they are stored as strings.
                 x = sm.add_constant( np.log10( df['conc'].values ))
                 y = df['avg.opt.density'].values
 
