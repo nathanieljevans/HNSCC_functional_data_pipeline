@@ -18,6 +18,8 @@ import statsmodels.api as sm
 import statsmodels
 import os
 import shutil
+from sklearn.preprocessing import PolynomialFeatures
+
 
 pd.options.display.width = 0
 
@@ -442,9 +444,6 @@ class panel:
         '''
         assert df.shape[0] == 7, 'There should only be 7 observations per replicate'
 
-        #print()
-        #print(df[['inhibitor','conc_norm', 'cell_viab', 'plate_num', 'plate_row', 'plate_col']])
-
         x = [np.log10(x) for x in df['conc_norm'].values]
         y = df['cell_viab'].values
 
@@ -458,7 +457,6 @@ class panel:
         yhat = glm_res.predict(sm.add_constant(x2))
         auc = np.sum(yhat*delta)
 
-        plt.gcf()
         f = plt.figure(figsize = (10,10))
         plt.title('Linear Regression [AUC=%.2f]' %auc)
         plt.plot(x, y, 'ro', label='replicate')
@@ -484,6 +482,132 @@ class panel:
         '''
         self._log('Applying a ceiling of 1 to cell viability...')
         self.data = self.data.assign(cell_viab = [1 if cv > 1 else cv for cv in self.data.cell_viab])
+
+    def fit_probit(self, inhib, x, y, df, res, failures, plot=True):
+        '''
+
+        '''
+        try:
+            pr = sm.GLM(y, sm.add_constant(x), family=sm.families.Binomial(link=sm.families.links.probit()))
+            glm_res = pr.fit(disp=False)
+
+            auc, x2, yhat = self.calculate_auc(x, glm_res)
+
+            f, ax = plt.subplots(1,1, figsize=(10,10))
+            plt.title('inhib: %s [AUC= %.2f]' %(inhib, auc))
+            plt.plot(x2, yhat, 'r-', label='probit_fit')
+            plt.plot(x, y, 'bo', label='replicates')
+            plt.legend()
+            if plot: plt.show()
+            self._save_plot(f, inhib)
+            plt.close(f)
+
+            # beta0 = intercept
+            # beta1 = slope
+            intercept,beta1 = glm_res.params
+            probit_AIC, probit_BIC = glm_res.aic, glm_res.bic
+            probit_Deviance = glm_res.deviance
+            probit_pval = glm_res.pvalues
+
+            self._write_summary_to_file(glm_res.summary(), 'probit', inhib)
+
+            # update results
+            [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc', 'prob_conv', 'prob_AIC', 'prob_BIC', 'prob_deviance', 'prob_pval'], [inhib, intercept ,beta1 , auc, True, probit_AIC, probit_BIC, probit_Deviance, probit_pval])]
+
+        except statsmodels.tools.sm_exceptions.PerfectSeparationError as e:
+            '''
+            Perfect separation occurs when all cell_viab values are identical.
+            This most commonly occurs with cell_viab = 1
+            '''
+            self._log('Perfect separation has occured during probit fitting [%s]\n\t cell_viab values: %r' %(inhib, df['cell_viab'].values))
+            cv = df['cell_viab'].unique()
+            #assert len(cv) == 1, 'perfect separation has occured, however, there are multiple cell_viab values. Please investigate issue.'
+
+            if (len(cv) == 1):
+                self._log('cell_viab values identical; AUC will be calculated by conc-range * cell_viab')
+                cv = cv[0]
+                auc = cv * (np.log10(max(df['conc_norm'])) - np.log10(min(df['conc_norm'])))
+            else:
+                self._log('cell_viab values non-identical; AUC valule will be calculated by linear regression.')
+                auc, f = self._get_lin_auc(df, plot=plot, return_fig=True)
+                self._save_plot(f, inhib)
+                plt.close('all')
+
+            [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc', 'prob_conv', 'prob_AIC', 'prob_BIC', 'prob_deviance', 'prob_pval'], [inhib, None, None, auc, False, None, None, None, None])]
+
+        except:
+            #print('some other exception...')
+            failures.append( inhib )
+            #[res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc'], [inhib, 'NA' ,'NA' , 'NA'])]
+            if plot:
+                f, ax = plt.subplots(1,1, figsize = (10,10))
+                ax.set_title('FAILURE: %s' %(inhib))
+                #sbn.scatterplot(x=x2, y=yhat , ax=ax)
+                plt.xscale('log')
+                sbn.scatterplot(x=x, y=y, ax=ax)
+                plt.show()
+            raise
+
+    def fit_poly(self, inhib, x, y, res, failures, degree=5, plot=True):
+        '''
+
+        '''
+        try:
+            xp = PolynomialFeatures(degree=degree).fit_transform(x.reshape((-1,1)))
+
+            pr = sm.GLM(y, xp)
+            poly_res = pr.fit(disp=False)
+
+            x2 = np.arange(min(x), max(x), 0.01)
+            x2p = PolynomialFeatures(degree=degree).fit_transform(x2.reshape((-1,1)))
+            yhat = poly_res.predict(sm.add_constant(x2p))
+
+            f, ax = plt.subplots(1,1, figsize=(10,10))
+            plt.title('POLY FIT (degree=%d) - inhib: %s' %(degree, inhib))
+            plt.plot(x2, yhat, 'r-', label='probit_fit')
+            plt.plot(x, y, 'bo', label='replicates')
+            plt.legend()
+            if plot: plt.show()
+
+            self._save_plot(f, inhib, suffix='-poly5')
+            plt.close(f)
+
+            poly_AIC, poly_BIC = poly_res.aic, poly_res.bic
+            poly_Deviance = poly_res.deviance
+            poly_pval = poly_res.pvalues
+
+            self._write_summary_to_file(poly_res.summary(), 'poly5', inhib)
+
+            # update results
+            [res[var].append(val) for var,val in zip(['inhibitor', 'poly_degree', 'poly_AIC', 'poly_BIC', 'poly_deviance', 'poly_pval'], [inhib, degree, poly_AIC, poly_BIC, poly_Deviance, poly_pval])]
+
+        except ValueError as e:
+            self._log('WARNING! [%s] - %s' %(inhib, str(e)))
+
+        except:
+            print('I see the error of my ways :|')
+            failures.append( inhib )
+
+            raise
+
+    def _write_summary_to_file(self, summary, model_type, inhib, output_dir='../output/'):
+        '''
+
+        '''
+        dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
+        with open('%s/dose-response-plots/%s/GLM_%s_summary.txt' %(dirout, inhib, model_type), 'w') as f:
+            f.write(str(summary))
+
+    def calculate_auc(self, x, model, delta=0.001):
+        '''
+
+        '''
+        # AUC calculation -----------------------------------------------------
+        # left rectangle auc estimate
+        # x is already in log10 space
+        x2 = np.arange(min(x), max(x), delta)
+        yhat = model.predict(sm.add_constant(x2))
+        return np.sum(yhat*delta), x2, yhat
 
     def fit_regressions(self, plot=True):
         '''
@@ -517,7 +641,9 @@ class panel:
         self._log('fitting probit regressions...')
 
         failures = []
-        res = {x:[] for x in ['lab_id', 'inhibitor','intercept', 'beta1', 'auc', 'prob_conv']}
+        probit_res = {x:[] for x in ['inhibitor','intercept', 'beta1', 'auc', 'prob_conv', 'prob_AIC', 'prob_BIC', 'prob_deviance', 'prob_pval']}
+        poly_res = {x:[] for x in ['inhibitor', 'poly_degree', 'poly_AIC', 'poly_BIC', 'poly_deviance', 'poly_pval']}
+
         i = 0
 
         # Filter controls
@@ -530,7 +656,6 @@ class panel:
         ntofit = int(pat_dat.shape[0] / 7)
         self._log('number of assays to fit: %d' %ntofit)
 
-
         for inhib in set(pat_dat['inhibitor'].values):
             if i%1==0: print('Progress: %.1f%% \t[%d/%d]' %(i/ntofit*100, i, ntofit), end='\r')
             i+=1
@@ -539,77 +664,25 @@ class panel:
 
             assert df.shape[0] == 7, 'should have exactly 7 doses! [has %d]' %df.shape[0]
 
-            try:
-                x = np.log10( df['conc_norm'].values )
-                y = df['cell_viab'].values
+            x = np.log10( df['conc_norm'].values )
+            y = df['cell_viab'].values
 
-                pr = sm.GLM(y, sm.add_constant(x), family=sm.families.Binomial(link=sm.families.links.probit()))
-                glm_res = pr.fit(disp=False)
+            # probit_res is an object and so should be passed by reference, hence modified inplace
+            self.fit_probit(inhib, x, y, df, probit_res, failures, plot=plot)
 
-                # AUC calculation -----------------------------------------------------
-                # left rectangle auc estimate
-                delta = 0.001
-                x2 = np.arange(np.log10(min(df['conc_norm'].values)), np.log10(max(df['conc_norm'].values)), delta)
-                yhat = glm_res.predict(sm.add_constant(x2))
-                auc = np.sum(yhat*delta)
-
-                plt.gcf()
-                f, ax = plt.subplots(1,1, figsize=(10,10))
-                plt.title('inhib: %s [AUC= %.2f]' %(inhib, auc))
-                plt.plot(x2, yhat, 'r-', label='probit_fit')
-                plt.plot(x, y, 'bo', label='replicates')
-                plt.legend()
-
-                if plot: plt.show()
-
-                self._save_plot(f, inhib)
-                plt.close(f)
-
-                # beta0 = intercept
-                # beta1 = slope
-                (intercept,beta1) = glm_res.params
-
-                # update results
-                [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc', 'prob_conv'], [inhib, intercept ,beta1 , auc, True])]
-
-            except statsmodels.tools.sm_exceptions.PerfectSeparationError as e:
-                '''
-                Perfect separation occurs when all cell_viab values are identical.
-                This most commonly occurs with cell_viab = 1
-                '''
-                self._log('Perfect separation has occured during probit fitting [%s]\n\t cell_viab values: %r' %(inhib, df['cell_viab'].values))
-                cv = df['cell_viab'].unique()
-                #assert len(cv) == 1, 'perfect separation has occured, however, there are multiple cell_viab values. Please investigate issue.'
-
-                if (len(cv) == 1):
-                    self._log('cell_viab values identical; AUC will be calculated by conc-range * cell_viab')
-                    cv = cv[0]
-                    auc = cv * (np.log10(max(df['conc_norm'])) - np.log10(min(df['conc_norm'])))
-                else:
-                    self._log('cell_viab values non-identical; AUC valule will be calculated by linear regression.')
-                    auc, f = self._get_lin_auc(df, plot=plot, return_fig=True)
-                    self._save_plot(f, inhib)
-                    plt.close('all')
-
-                [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc', 'prob_conv'], [inhib, None, None, auc, False])]
-
-            except:
-                print('some other exception...')
-                failures.append( inhib )
-                [res[var].append(val) for var,val in zip(['inhibitor','intercept', 'beta1', 'auc'], [inhib, 'NA' ,'NA' , 'NA'])]
-                if plot:
-                    f, ax = plt.subplots(1,1, figsize = (10,10))
-                    ax.set_title('FAILURE: %s' %(inhib))
-                    #sbn.scatterplot(x=x2, y=yhat , ax=ax)
-                    plt.xscale('log')
-                    sbn.scatterplot(x=x, y=y, ax=ax)
-                    plt.show()
-                raise
+            # fit polynomial for comparison to overfitting
+            self.fit_poly(inhib, x, y, poly_res, failures, plot=plot)
 
         print()
         self._log('Failures [%d]: \n\t%r' %(len(failures),failures))
 
-    def _save_plot(self, fig, inhibitor,output_dir='../output'):
+        # add probit features
+        self.data = self.data.merge(pd.DataFrame(probit_res), how='left', on='inhibitor')
+
+        # add poly features
+        self.data = self.data.merge(pd.DataFrame(poly_res), how='left', on='inhibitor')
+
+    def _save_plot(self, fig, inhibitor, output_dir='../output', suffix='-probit'):
         '''
 
         '''
@@ -618,9 +691,8 @@ class panel:
             self._log('creating dose response curve plot directory: %s' %dirout)
             os.makedirs(dirout)
 
-        if os.path.exists(dirout + '/dose-response-plots/'): shutil.rmtree(dirout + '/dose-response-plots/')
-        os.makedirs(dirout + '/dose-response-plots/' + inhibitor)
-        fig.savefig('%s/dose-response-plots/%s/dose-response-curve.PNG' %(dirout, inhibitor))
+        if not os.path.exists(dirout + '/dose-response-plots/' + inhibitor): os.makedirs(dirout + '/dose-response-plots/' + inhibitor)
+        fig.savefig('%s/dose-response-plots/%s/dose-response-curve%s.PNG' %(dirout, inhibitor, suffix))
         plt.close(fig)
 
     def write_log(self, output_dir='../output'):
@@ -631,6 +703,13 @@ class panel:
         with open(dirout + '/output.logs', 'w') as f:
             f.write(self.msg_log)
 
+    def write_data_to_file(self, output_dir='../output'):
+        '''
+
+        '''
+        dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
+        self._log('writing data to file: %s/HNSCC_processed_functional_data.csv' %dirout)
+        self.data.to_csv('%s/HNSCC_processed_functional_data.csv' %dirout)
 
 if __name__ == '__main__':
 
@@ -656,6 +735,8 @@ if __name__ == '__main__':
     p.set_ceiling()
     print('fitting dose response curve...')
     p.fit_regressions(plot=False)
+    print('writing data to file...')
+    p.write_data_to_file()
     print('writing logs to file...')
     p.write_log()
     print('complete.')
