@@ -116,7 +116,7 @@ def get_plate_data(data_path, verbose=False):
 
 # ------------------------------------------------------------------------------
 
-def get_plate_map(map_path, verbose=True):
+def get_plate_map(map_path, verbose=False):
     '''
     get the plate mapping data from the excel plate map
 
@@ -218,9 +218,9 @@ class panel:
 
             # check for blank490 column ... confidence in proper documentation
             if dat.shape[1] < 26:
-                if not warned: self._log('WARNING: This assay [lab_id=%s,notes=%s] does not have a "blank490" column (last col), please double check that the data has been normalized by the positive controls.' %(lab_id,notes))
+                if not warned: self._log('WARNING: This assay [lab_id=%s,notes=%s] does not have a "blank490" column (last col), please double check that the data has been normalized by the positive controls.' %(self.lab_id,self.notes))
                 warned = True
-                if blank490: self._log('WARNING: file name specifies blank490, but data does not appeaer to be postive control normalized.')
+                if self.blank490: self._log('WARNING: file name specifies blank490, but data does not appeaer to be postive control normalized.')
                 self.blank490=False
                 dat = dat.assign(plate_row = dat[0]).assign(norm_type = 'none', plate_num = p+1, lab_id = self.lab_id, assay_version_id=self.version_id, note=self.notes).drop(labels = [0], axis='columns')
             else:
@@ -345,11 +345,6 @@ class panel:
 
                     if assay.shape[0] > 7:
                         n+=1
-                        replicates.append(inhib)
-
-                        new_obs = assay.groupby(['lab_id','inhibitor','conc_norm', 'plate_num'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm', 'plate_num'])
-
-                        avgd_obs.append(new_obs)
 
                         aucs = []
                         # groupby row - TODO: should double check that no replicates are on same row
@@ -359,6 +354,10 @@ class panel:
                             aucs.append(self._get_lin_auc(repl))
 
                         if max(aucs) - min(aucs) > flag_threshold: toflag.append(inhib)
+
+                        replicates.append(inhib)
+                        new_obs = assay.groupby(['lab_id','inhibitor','conc_norm', 'plate_num'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm', 'plate_num']).assign(within_plate_repl_flag = (max(aucs) - min(aucs)) > flag_threshold)
+                        avgd_obs.append(new_obs)
 
             self._log('There were %d within plate replicates [%r]' %(n, replicates))
             self._log('within plate replicates flagged: %r' %toflag)
@@ -377,7 +376,7 @@ class panel:
             # add auc diff flag for removal
             if (len(toflag) > 0):
                 flags = pd.DataFrame({'inhibitor': toflag, 'within_plate_repl_flag': [True]*len(toflag)})
-                self.data = self.data.merge(flags, how='left', by='inhibitor').assign(within_plate_repl_flag = lambda x: [True if f else False for f in x.withinplate_repl_flag])
+                self.data = self.data.assign(within_plate_repl_flag = lambda x: [True if f else False for f in x.withinplate_repl_flag]).merge(flags, how='left', by='inhibitor')
             else:
                 self.data.assign(within_plate_repl_flag = False)
 
@@ -394,9 +393,6 @@ class panel:
                 #print('assay shape: %s' %str(assay.shape))
                 if assay.shape[0] > 7:
                     n+=1
-                    replicates.append(inhib)
-                    new_obs = assay.groupby(['lab_id','inhibitor','conc_norm'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm'])
-                    avgd_obs.append(new_obs)
 
                     aucs = []
                     # groupby row - TODO: should double check that no replicates are on same row
@@ -406,7 +402,11 @@ class panel:
                         aucs.append(self._get_lin_auc(repl))
 
                     self._log('[%s] linear AUCs: %r -- range: (%.2f, %.2f)' %(inhib, aucs, min(aucs), max(aucs)))
-                    if max(aucs) - min(aucs) > flag_threshold: toflag.append(inhib)
+                    if (max(aucs) - min(aucs)) > flag_threshold: toflag.append(inhib)
+
+                    replicates.append(inhib)
+                    new_obs = assay.groupby(['lab_id','inhibitor','conc_norm'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm']).assign(across_plate_repl_flag = (max(aucs) - min(aucs)) > flag_threshold)
+                    avgd_obs.append(new_obs)
 
             self._log('There were %d across plate replicates [%r]' %(n, replicates))
             self._log('across plate replicates flagged: %r' %toflag)
@@ -424,7 +424,7 @@ class panel:
 
             if (len(toflag) > 0):
                 flags = pd.DataFrame({'inhibitor': toflag, 'across_plate_repl_flag': [True]*len(toflag)})
-                self.data = self.data.merge(flags, how='left', on='inhibitor').assign(across_plate_repl_flag = lambda x: [True if f else False for f in x.withinplate_repl_flag])
+                self.data = self.data.assign(across_plate_repl_flag = lambda x: [True if f else False for f in x.across_plate_repl_flag]).merge(flags, how='left', on='inhibitor')
             else:
                 self.data.assign(across_plate_repl_flag = False)
 
@@ -600,11 +600,15 @@ class panel:
 
     def calculate_auc(self, x, model, delta=0.001):
         '''
+        left rectangle auc estimate. Note that x is already in log10 space.
 
+        inputs
+            x <numpy array> endogenous variable
+            model <sm.GLMmodel.results> model
+            delta <float> the rectangular width to use for each rectangle; smaller = more accurate
+        outputs
+            auc
         '''
-        # AUC calculation -----------------------------------------------------
-        # left rectangle auc estimate
-        # x is already in log10 space
         x2 = np.arange(min(x), max(x), delta)
         yhat = model.predict(sm.add_constant(x2))
         return np.sum(yhat*delta), x2, yhat
@@ -657,7 +661,7 @@ class panel:
         self._log('number of assays to fit: %d' %ntofit)
 
         for inhib in set(pat_dat['inhibitor'].values):
-            if i%1==0: print('Progress: %.1f%% \t[%d/%d]' %(i/ntofit*100, i, ntofit), end='\r')
+            if i%1==0: print('\t\tFitting regressions...Progress: %.1f%% \t[%d/%d]' %(i/ntofit*100, i, ntofit), end='\t\t\t\t\t\r')
             i+=1
 
             df = pat_dat[pat_dat['inhibitor'] == inhib]
@@ -673,7 +677,6 @@ class panel:
             # fit polynomial for comparison to overfitting
             self.fit_poly(inhib, x, y, poly_res, failures, plot=plot)
 
-        print()
         self._log('Failures [%d]: \n\t%r' %(len(failures),failures))
 
         # add probit features
@@ -686,14 +689,17 @@ class panel:
         '''
 
         '''
-        dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
-        if not os.path.exists(dirout):
-            self._log('creating dose response curve plot directory: %s' %dirout)
-            os.makedirs(dirout)
+        try:
+            dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
+            if not os.path.exists(dirout):
+                self._log('creating dose response curve plot directory: %s' %dirout)
+                os.makedirs(dirout)
 
-        if not os.path.exists(dirout + '/dose-response-plots/' + inhibitor): os.makedirs(dirout + '/dose-response-plots/' + inhibitor)
-        fig.savefig('%s/dose-response-plots/%s/dose-response-curve%s.PNG' %(dirout, inhibitor, suffix))
-        plt.close(fig)
+            if not os.path.exists(dirout + '/dose-response-plots/' + inhibitor): os.makedirs(dirout + '/dose-response-plots/' + inhibitor)
+            fig.savefig('%s/dose-response-plots/%s/dose-response-curve%s.PNG' %(dirout, inhibitor, suffix))
+            plt.close(fig)
+        except Exception as e:
+            self._log('failed to save plot [%s] \n\tError:  %s' %(inhibitor, str(e)))
 
     def write_log(self, output_dir='../output'):
         '''
@@ -711,35 +717,55 @@ class panel:
         self._log('writing data to file: %s/HNSCC_processed_functional_data.csv' %dirout)
         self.data.to_csv('%s/HNSCC_processed_functional_data.csv' %dirout)
 
+    def post_processing_set_flags(self, aic_lim = 12, deviance_lim = 2):
+        '''
+
+        '''
+        self.data = self.data.assign(AIC_flag = lambda x: x.prob_AIC > aic_lim,
+                                     DEV_flag = lambda x: x.prob_deviance > deviance_lim,
+                                     overfit_flag = lambda x: x.poly_AIC > x. prob_AIC)
+
+def process(plate_path, platemap_dir = '../plate_maps/'):
+    '''
+
+    '''
+    try:
+        print('\t\tinitializing panel...', end='\t\t\t\t\t\r')
+        p = panel(plate_path=plate_path, platemap_dir = platemap_dir, verbose=False)
+        print('\t\tmapping data...', end='\t\t\t\t\t\r')
+        p.map_data()
+        print('\t\tnormalizing combination agent concentrations...', end='\t\t\t\t\t\r')
+        p.normalize_combinationagent_concentrations()
+        print('\t\tnormalizing cell viability by negative controls...', end='\t\t\t\t\t\r')
+        p.normalize_cell_viability_by_negative_controls()
+        print('\t\tsetting floor of zero...', end='\t\t\t\t\t\r')
+        p.set_floor()
+        print('\t\taveraging within plate replicates...', end='\t\t\t\t\t\r')
+        p.avg_plate_replicates(method='within', flag_threshold=1)
+        print('\t\taveraging across plate replicates...', end='\t\t\t\t\t\r')
+        p.avg_plate_replicates(method='across', flag_threshold=0.75)
+        print('\t\tsetting ceiling of 1...', end='\t\t\t\t\t\r')
+        p.set_ceiling()
+        print('\t\tfitting dose response curve...', end='\t\t\t\t\t\r')
+        p.fit_regressions(plot=False)
+        print('\t\tsetting post processing flags...', end='\t\t\t\t\t\r')
+        p.post_processing_set_flags(aic_lim = 12, deviance_lim = 2)
+        print('\t\twriting data to file...', end='\t\t\t\t\t\r')
+        p.write_data_to_file()
+        print('\t\twriting logs to file...', end='\t\t\t\t\t\r')
+        p.write_log()
+        print('\t\tcomplete.', end='\t\t\t\t\t\n')
+
+    except Exception as e:
+        p._log('Processing Failed: \n\t%s' %str(e))
+        p.write_log()
+
+
 if __name__ == '__main__':
 
     # testing
-    plate_path = '../data/lab_id=10004-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx'
+    plate_path = '../data/lab_id=10139-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx' #
+    #'../data/lab_id=10004-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx'
     platemap_dir = '../plate_maps/'
 
-    print('initializing panel...')
-    p = panel(plate_path=plate_path, platemap_dir = platemap_dir, verbose=False)
-    print('mapping data...')
-    p.map_data()
-    print('normalizing combination agent concentrations...')
-    p.normalize_combinationagent_concentrations()
-    print('normalizing cell viability by negative controls...')
-    p.normalize_cell_viability_by_negative_controls()
-    print('setting floor of zero...')
-    p.set_floor()
-    print('averaging within plate replicates...')
-    p.avg_plate_replicates(method='within', flag_threshold=1)
-    print('averaging across plate replicates...')
-    p.avg_plate_replicates(method='across', flag_threshold=0.75)
-    print('setting ceiling of 1...')
-    p.set_ceiling()
-    print('fitting dose response curve...')
-    p.fit_regressions(plot=False)
-    print('writing data to file...')
-    p.write_data_to_file()
-    print('writing logs to file...')
-    p.write_log()
-    print('complete.')
-
-
-    #print(p.msg_log)
+    process(plate_path, platemap_dir)
