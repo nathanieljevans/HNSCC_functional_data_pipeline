@@ -21,4 +21,5 @@ if __name__ == '__main__':
         except Exception as e:
             print('Failed to combine %s\n\t%s' %(ppath, str(e)))
 
+    adata = adata.drop('Unnamed: 0', axis='columns')
     adata.to_csv(output_dir + '/HNSCC_all_functional_data.csv')
