@@ -1,0 +1,46 @@
+---
+title: "Quality Control Data Processing Alluvial Plot"
+author: "Nathaniel Evans"
+date: "August 16, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(ggalluvial)
+```
+
+
+
+```{r}
+drug.data = read.csv('../output/HNSCC_all_functional_data.csv', as.is=T) %>% mutate(
+                                    low_PAC_flag = as.logical(low_PAC_flag), 
+                                    is_within_plate_repl = as.logical(is_within_plate_repl), 
+                                    is_across_plate_repl = as.logical(is_across_plate_repl), 
+                                    AIC_flag = as.logical(AIC_flag), 
+                                    DEV_flag = as.logical(DEV_flag), 
+                                    overfit_flag = as.logical(overfit_flag))
+```
+
+```{r}
+drug.data %>% head()
+
+#drug.data %>% glimpse() 
+
+#drug.data %>% summary()
+```
+
+```{r}
+
+viz.dat <- drug.data %>% select(lab_id, auc,low_PAC_flag, is_within_plate_repl, is_across_plate_repl, AIC_flag, DEV_flag, overfit_flag) %>% unique() %>% mutate(is.kept = !low_PAC_flag & !is_within_plate_repl & !is_across_plate_repl & !DEV_flag & !overfit_flag)
+```
+
+```{r}
+
+viz.dat %>% ggplot(aes(axis1 = low_PAC_flag, axis2 = is_within_plate_repl, axis3=is_across_plate_repl, axis4=AIC_flag, axis5=DEV_flag, aixs6=overfit_flag)) +
+  geom_alluvium(aes(fill=is.kept), width = 1/12)
+
+# , axis3=is_across_plate_repl, axis4=AIC_flag, axis5=DEV_flag, aixs6=overfit_flag
+```

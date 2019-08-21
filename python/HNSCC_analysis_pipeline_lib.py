@@ -1,12 +1,11 @@
 '''
 @author: Nate Evans
 @date: 7/16/2019
-@title: HNSCC Functional Data Analysis Pipeline
+@title: HNSCC Functional Data Analysis Pipeline Library
 
 The purpose of this script is to provide the resources to enable an automated
 analysis pipeline of functional drug response data in the HNSCC project at
 OHSU led by Shannon McWeeney and Molly Kulesz-Martin.
-
 '''
 
 import pandas as pd
@@ -19,9 +18,7 @@ import statsmodels
 import os
 import shutil
 from sklearn.preprocessing import PolynomialFeatures
-
-
-pd.options.display.width = 0
+from keras.models import load_model
 
 def parse_pathname(path, verbose=False):
     '''
@@ -725,9 +722,36 @@ class panel:
                                      DEV_flag = lambda x: x.prob_deviance > deviance_lim,
                                      overfit_flag = lambda x: x.poly_AIC > x. prob_AIC)
 
+    def predict_hermetric_transition(self, model_dir='../../atypical_doseresponse_classifier/best_model/best_model.159-55.24.h5'):
+        '''
+        This requires dependencies, the github repo can be found here: https://github.com/nathanieljevans/atypical_doseresponse_classifier.git
+
+        This isn't functional yet... maybe it should come in later honestly in the pipeline.
+        '''
+        if os.path.exists(model_path):
+            try:
+                model = load_model(model_path)
+                pred_data = self.data[['inhibitor', 'conc_norm', 'cell_viab']].pivot(index='inhibitor', columns='conc_norm', values='cell_viab')
+                print(pred_data.head())
+
+            except:
+                self._log('hermetic transition prediction failed')
+                self.data = self.data.assign(predicted_hermetic_transition = 'NA')
+        else:
+            #print('model path does not exist')
+            self._log('Invalid model_path, github repo can be found here: https://github.com/nathanieljevans/atypical_doseresponse_classifier.git')
+            self.data = self.data.assign(predicted_hermetic_transition = 'NA')
+
+
+
 def process(plate_path, platemap_dir = '../plate_maps/'):
     '''
+    This method loads a file representing a single plate assay into memory, maps plate locations to
+    concentration, inhibitor and then preforms the processing defined by the data pipeline.
 
+    inputs
+        plate_path <str> file path to plate, must be a .xlsx file in proper naming format.
+        platemap_dir <str> 
     '''
     try:
         print('\t\tinitializing panel...', end='\t\t\t\t\t\r')
@@ -748,6 +772,8 @@ def process(plate_path, platemap_dir = '../plate_maps/'):
         p.set_ceiling()
         print('\t\tfitting dose response curve...', end='\t\t\t\t\t\r')
         p.fit_regressions(plot=False)
+        #print('predicting hermetic transition points...')
+        #p.predict_hermetric_transition()
         print('\t\tsetting post processing flags...', end='\t\t\t\t\t\r')
         p.post_processing_set_flags(aic_lim = 12, deviance_lim = 2)
         print('\t\twriting data to file...', end='\t\t\t\t\t\r')
@@ -760,8 +786,8 @@ def process(plate_path, platemap_dir = '../plate_maps/'):
         p._log('Processing Failed: \n\t%s' %str(e))
         p.write_log()
 
-
 if __name__ == '__main__':
+    pd.options.display.width = 0
 
     # testing
     plate_path = '../data/lab_id=10139-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx' #
