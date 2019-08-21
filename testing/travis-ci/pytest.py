@@ -3,3 +3,5 @@
 import numpy as np # check requirements 
 
 print('hello, world.') 
+
+x = 3/0 # test failure
