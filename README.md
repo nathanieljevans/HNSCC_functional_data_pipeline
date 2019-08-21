@@ -1,9 +1,11 @@
-<center>
+<center>  
+	
 | **Test**          | **Status**                                                                                                                         | Script Source                 |
 |-------------------|------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
 | Doc Testing       | ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) | ./testing/travis-ci/pytest.py |
 | Unit Testing      | ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) | ./testing/travis-ci/pytest.py |
-| Simulated Testing | ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) | ./testing/travis-ci/pytest.py |
+| Simulated Testing | ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) | ./testing/travis-ci/pytest.py |  
+
 </center>
 
 # HNSCC_functional_data_pipeline
