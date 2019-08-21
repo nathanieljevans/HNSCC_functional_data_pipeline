@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/nathanieljevans/HNSCC_functional_data_pipeline.png?branch=master)](https://travis-ci.org/nathanieljevans/HNSCC_functional_data_pipeline?branch=master)
+![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master)
 
 
 # HNSCC_functional_data_pipeline
