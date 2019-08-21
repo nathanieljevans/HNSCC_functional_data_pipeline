@@ -1,9 +1,0 @@
-language: python
-python:
-  - "3.6"      # current detault Python on Travis CI
-# command to install dependencies
-install:
-  - pip install -r ./testing/travis-ci/requirements.txt
-# command to run tests
-script:
-  - ./testing/travis-ci/pytest.py
