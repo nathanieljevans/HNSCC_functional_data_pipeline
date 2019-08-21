@@ -1,4 +1,8 @@
-Doctesting:  ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) ------ Unit Testing:  ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) ----- Synthetic Testing:  ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master)
+| **Test**          | **Status**                                                                                                                         |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| Doc Testing       | ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) |
+| Unit Testing      | ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) |
+| Simulated Testing | ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) |
 
 
 # HNSCC_functional_data_pipeline
