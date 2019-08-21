@@ -1,4 +1,4 @@
-![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master)
+Doctesting:  ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) \tUnit Testing:  ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master) \tSynthetic Testing:  ![Build Status](https://travis-ci.com/nathanieljevans/HNSCC_functional_data_pipeline.svg?token=zPniWxYp2wzAhzsfUDCq&branch=master)
 
 
 # HNSCC_functional_data_pipeline
