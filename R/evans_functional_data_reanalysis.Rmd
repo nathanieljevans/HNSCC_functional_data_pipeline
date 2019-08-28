@@ -218,10 +218,17 @@ HNSCC_plate_data_mapper.py ./data/HNSCC_plate_maps ./data/HNSCC_function_assay_d
 
 ```{r}
 
-hnscc.inhib <- read.csv2('./HNSCC_FUNCTIONAL_ASSAY_MAPPED_DOSE_RESPONSE_DATA/HNSCC_funcData_07_18_2019.csv', as.is=T, header=T, sep=',')
+hnscc.inhib <- func.dat <- read.csv('../output/HNSCC_all_functional_data.csv', as.is=T)
 
 hnscc.inhib %>% head() 
 
+hnscc.inhib %>% select(lab_id) %>% unique() %>% nrow()
+
+```
+
+```{r}
+hnscc.inhib %>% group_by(norm_type) %>% count()
+hnscc.inhib %>% filter(norm_type != 'Blank 490') %>% select(lab_id, norm_type) %>% unique()
 ```
 
 

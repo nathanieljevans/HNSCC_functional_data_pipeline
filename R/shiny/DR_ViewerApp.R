@@ -4,6 +4,7 @@ library(tidyverse)
 library(markdown)
 library(shiny)
 library(batman)
+library(knitr)
 
 na.to.f <- function(val) { 
   return( ifelse(val == TRUE, T, F))
@@ -22,7 +23,7 @@ get.dr.table <- function(input){
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   
-  assay.dat <- assay.dat %>% select(conc_norm, cell_viab, auc, PAC, prob_AIC, poly_AIC, prob_deviance) 
+  assay.dat <- assay.dat %>% select(auc, PAC, prob_AIC, poly_AIC, prob_deviance) %>% unique() # conc_norm, cell_viab,
 
   return (assay.dat)
 }
@@ -31,8 +32,6 @@ QC_filter <- function(dat) {
   dat <- dat %>% filter( !to_logical(low_PAC_flag) & !to_logical(is_within_plate_repl) & !to_logical(is_across_plate_repl) & !to_logical(across_plate_repl_flag) & !to_logical(AIC_flag) & !to_logical(DEV_flag))  # overfit_flag??? 
   return(dat)
 }
-
-
 
 
 # ----------------------------------------------------------------------------------------------
