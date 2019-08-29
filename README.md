@@ -21,6 +21,8 @@ To run this pipeline,
 $ python -W ignore sequential_processing_job.py ../plate_maps/ ../data/
 
 $ python combine_processed_panels.py ../output
+
+$ python patient_sensitivity_assignment.py ../output/HNSCC_all_functional_data.csv
 ```
 
 

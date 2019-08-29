@@ -5,6 +5,7 @@ library(markdown)
 library(shiny)
 library(batman)
 library(knitr)
+library(shinyWidgets)
 
 na.to.f <- function(val) { 
   return( ifelse(val == TRUE, T, F))
@@ -14,8 +15,14 @@ get.dr.plot <- function(input){
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   
-  plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, marker=panel_id))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + geom_smooth(method="lm",formula=y ~ poly(x, 5, raw=TRUE),color="red", se=F) + ggtitle('Dose-response Curve') 
-  
+  if (input$poly) {
+    plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + geom_smooth(method="lm",formula=y ~ poly(x, 5, raw=TRUE),color="red", se=F) + ggtitle('Dose-response Curve') 
+    
+  } else {
+    plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Dose-response Curve') 
+    
+  }
+
   return (plt)
 }
 
@@ -33,6 +40,16 @@ QC_filter <- function(dat) {
   return(dat)
 }
 
+get.PAC.plot <- function(input){ 
+  assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
+  filt <- assay.dat %>% select(panel_id, plate_num) %>% unique()
+  PAC.dat <- func.dat %>% filter( inhibitor %in% c('DMSO', 'NONE') & lab_id == input$lab_id & panel_id %in% filt$panel_id & plate_num %in% filt$plate_num) %>% mutate(plate.id = as.factor(paste(panel_id, plate_num, sep='-')))
+  
+  plt <- PAC.dat %>% ggplot(aes(x=cell_viab, fill=plate.id)) + geom_density(alpha=0.2) + ggtitle('Plate Controls Distribution')
+  
+  return(plt)
+}
+
 
 # ----------------------------------------------------------------------------------------------
 
@@ -41,7 +58,9 @@ func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T)
 
 server <- function(input, output, session) {
 
-  output$plot <- renderPlot({ get.dr.plot(input) })
+  output$dr_curve <- renderPlot({ get.dr.plot(input) })
+  
+  output$PAC_controls <- renderPlot({ get.PAC.plot(input)})
   
   output$DR.table <- renderDataTable({ get.dr.table(input) })
   
@@ -51,36 +70,33 @@ server <- function(input, output, session) {
 }
 
 ui <- navbarPage("HNSCC Functional Data GUI",
-                 tabPanel("Plot",
+                 tabPanel("Patient-Level",
                           sidebarLayout(
                             sidebarPanel(
                               selectInput('lab_id', 'Patient ID', unique(func.dat$lab_id),
                                           selected=NULL), 
                               selectInput('inhib', 'Inhibitor', unique(func.dat$inhibitor),
-                                          selected=NULL)
+                                          selected=NULL),
+                              switchInput(inputId = 'poly', label = "Show poly", value = FALSE)
                             ),
                             mainPanel(
                                 fluidRow(
-                                  plotOutput("plot"),
-                                  DT::dataTableOutput("DR.table")
+                                  plotOutput("dr_curve"),
+                                  DT::dataTableOutput("DR.table"), 
+                                  plotOutput('PAC_controls')
                                   )
                               )
                           )
                  ),
-                 tabPanel("Summary",
+                 tabPanel("Inhibitor-Level",
                           verbatimTextOutput("summary")
                  ),
-                 navbarMenu("More",
-                            tabPanel("Table",
-                                     DT::dataTableOutput("table")
-                            ),
-                            tabPanel("About",
-                                     fluidRow(
-                                       column(6,
-                                              includeMarkdown("about.md")
-                                       )
-                                     )
+                 tabPanel("About",
+                          fluidRow(
+                            column(12,
+                                   includeMarkdown("about.md")
                             )
+                          )
                  )
 )
 
