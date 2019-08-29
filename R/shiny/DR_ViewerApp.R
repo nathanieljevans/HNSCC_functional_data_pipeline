@@ -14,7 +14,7 @@ get.dr.plot <- function(input){
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   
-  plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + geom_smooth(method="lm",formula=y ~ poly(x, 5, raw=TRUE),color="red", se=F) + ggtitle('Dose-response Curve') 
+  plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, marker=panel_id))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + geom_smooth(method="lm",formula=y ~ poly(x, 5, raw=TRUE),color="red", se=F) + ggtitle('Dose-response Curve') 
   
   return (plt)
 }
@@ -23,7 +23,7 @@ get.dr.table <- function(input){
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   
-  assay.dat <- assay.dat %>% select(auc, PAC, prob_AIC, poly_AIC, prob_deviance) %>% unique() # conc_norm, cell_viab,
+  assay.dat <- assay.dat %>% select(auc, PAC, panel_id, prob_AIC, poly_AIC, prob_deviance) %>% unique() # conc_norm, cell_viab,
 
   return (assay.dat)
 }

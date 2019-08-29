@@ -18,7 +18,7 @@ This project is joint lead by Shannon McWeeney &amp; Molly F. Kulesz-Martin. The
 To run this pipeline, 
 
 ```bash
-$ python -W ignore sequenitial_processing_job.py ../plate_maps/ ../data/
+$ python -W ignore sequential_processing_job.py ../plate_maps/ ../data/
 
 $ python combine_processed_panels.py ../output
 ```

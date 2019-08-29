@@ -18,7 +18,6 @@ import statsmodels
 import os
 import shutil
 from sklearn.preprocessing import PolynomialFeatures
-from keras.models import load_model
 
 def parse_pathname(path, verbose=False):
     '''
@@ -56,6 +55,7 @@ def parse_pathname(path, verbose=False):
 # deprecated
 def get_plate_data(data_path, verbose=False):
     '''
+    DEPRECATED
     each plate has 16 rows of drug data, then a empty row, then the next plate. Varying number of plates
 
     inputs
@@ -199,6 +199,7 @@ class panel:
         outputs
             dataframe
         '''
+
         allplates = pd.read_excel(self.plate_path, header=None)
 
         nplates = (allplates.shape[0] + 1) / 18
@@ -750,21 +751,26 @@ class panel:
         dlim = ' : '
 
         with open('../.assay_ids', 'r') as f:
-            assay_ids = {name:id for name, id in [x.split(dlim) for x in f.readlines()]}
+            assay_ids = {name:id for name, id in [x for x in [x.rstrip().split(dlim) for x in f.readlines()] if len(x) > 1]}
+            #print(assay_ids)
 
         if self.plate_path in assay_ids:
             assay_id = assay_ids[self.plate_path]
             self._log(f'This panel has been processed previously, using previously assigned panel_id [{assay_id}]')
+            #print(f'This panel has been processed previously, using previously assigned panel_id [{assay_id}]')
+
         elif (len(assay_ids.keys()) > 0):
             nxt = max([int(x) for x in assay_ids.values()]) + 1
             with open('../.assay_ids', 'a') as f:
-                f.write(f'{self.plate_path}{dlim}{nxt}')
+                f.write(f'{self.plate_path}{dlim}{nxt}\n')
             assay_id = nxt
             self._log(f'This panel has not been processed previously, assigning new panel_id [{assay_id}]')
+            #print(f'This panel has not been processed previously, assigning new panel_id [{assay_id}]')
         else:
+            #print('first assay id entry [1]')
             assay_id = 1
             with open('../.assay_ids', 'a') as f:
-                f.write(f'{self.plate_path}{dlim}{assay_id}')
+                f.write(f'{self.plate_path}{dlim}{assay_id}\n')
 
         self.data = self.data.assign(panel_id =  assay_id)
 
