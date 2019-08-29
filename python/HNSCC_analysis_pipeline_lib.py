@@ -742,22 +742,50 @@ class panel:
             self._log('Invalid model_path, github repo can be found here: https://github.com/nathanieljevans/atypical_doseresponse_classifier.git')
             self.data = self.data.assign(predicted_hermetic_transition = 'NA')
 
+    def assign_panel_id(self):
+        '''
+        assay id's are recorded in the file: .assay_ids
+
+        '''
+        dlim = ' : '
+
+        with open('../.assay_ids', 'r') as f:
+            assay_ids = {name:id for name, id in [x.split(dlim) for x in f.readlines()]}
+
+        if self.plate_path in assay_ids:
+            assay_id = assay_ids[self.plate_path]
+            self._log(f'This panel has been processed previously, using previously assigned panel_id [{assay_id}]')
+        elif (len(assay_ids.keys()) > 0):
+            nxt = max([int(x) for x in assay_ids.values()]) + 1
+            with open('../.assay_ids', 'a') as f:
+                f.write(f'{self.plate_path}{dlim}{nxt}')
+            assay_id = nxt
+            self._log(f'This panel has not been processed previously, assigning new panel_id [{assay_id}]')
+        else:
+            assay_id = 1
+            with open('../.assay_ids', 'a') as f:
+                f.write(f'{self.plate_path}{dlim}{assay_id}')
+
+        self.data = self.data.assign(panel_id =  assay_id)
 
 
-def process(plate_path, platemap_dir = '../plate_maps/'):
+
+def process(plate_path, platemap_dir = '../plate_maps/', verbose=False, do_raise=False):
     '''
     This method loads a file representing a single plate assay into memory, maps plate locations to
     concentration, inhibitor and then preforms the processing defined by the data pipeline.
 
     inputs
         plate_path <str> file path to plate, must be a .xlsx file in proper naming format.
-        platemap_dir <str> 
+        platemap_dir <str>
     '''
     try:
         print('\t\tinitializing panel...', end='\t\t\t\t\t\r')
-        p = panel(plate_path=plate_path, platemap_dir = platemap_dir, verbose=False)
+        p = panel(plate_path=plate_path, platemap_dir = platemap_dir, verbose=verbose)
         print('\t\tmapping data...', end='\t\t\t\t\t\r')
         p.map_data()
+        print('\t\tassigning assay identifier...', end='\t\t\t\t\t\r')
+        p.assign_panel_id()
         print('\t\tnormalizing combination agent concentrations...', end='\t\t\t\t\t\r')
         p.normalize_combinationagent_concentrations()
         print('\t\tnormalizing cell viability by negative controls...', end='\t\t\t\t\t\r')
@@ -785,6 +813,7 @@ def process(plate_path, platemap_dir = '../plate_maps/'):
     except Exception as e:
         p._log('Processing Failed: \n\t%s' %str(e))
         p.write_log()
+        if do_raise: raise
 
 if __name__ == '__main__':
     pd.options.display.width = 0
@@ -794,4 +823,4 @@ if __name__ == '__main__':
     #'../data/lab_id=10004-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx'
     platemap_dir = '../plate_maps/'
 
-    process(plate_path, platemap_dir)
+    process(plate_path, platemap_dir, verbose=False, do_raise=True)
