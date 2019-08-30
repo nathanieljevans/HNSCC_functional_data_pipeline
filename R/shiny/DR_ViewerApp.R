@@ -50,6 +50,17 @@ get.PAC.plot <- function(input){
   return(plt)
 }
 
+get.inhib.auc.dist <- function(input) { 
+  inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
+  
+  print(inhib.dat %>% head())
+  
+  plt <- inhib.dat %>% ggplot(aes(auc, fill=call)) + geom_histogram(bins=input$bins) + ggtitle('AUC distribution')
+  
+  return(plt)
+  
+}
+
 
 # ----------------------------------------------------------------------------------------------
 
@@ -67,6 +78,8 @@ server <- function(input, output, session) {
   output$summary <- renderPrint({ summary(func.dat) })
   
   output$table <- renderDataTable({ DT::datatable(func.dat) })
+  
+  output$inhib_dist <- renderPlot({ get.inhib.auc.dist(input) })
 }
 
 ui <- navbarPage("HNSCC Functional Data GUI",
@@ -89,7 +102,20 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                           )
                  ),
                  tabPanel("Inhibitor-Level",
-                          verbatimTextOutput("summary")
+                          sidebarLayout(
+                            sidebarPanel(
+                              selectInput('inhib2', 'Inhibitor', unique(func.dat$inhibitor),
+                                          selected=NULL), 
+                              sliderInput("bins", "Number of Bins",
+                                          min = 5, max = 30,
+                                          value = 20)
+                            ),
+                            mainPanel(
+                              fluidRow(
+                                plotOutput("inhib_dist")
+                              )
+                            )
+                          )
                  ),
                  tabPanel("About",
                           fluidRow(

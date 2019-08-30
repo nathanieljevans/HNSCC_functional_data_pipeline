@@ -15,8 +15,13 @@ if __name__ == '__main__':
     _, data_path = sys.argv
 
     data = pd.read_csv(data_path, low_memory=False)
+    in_shp = data.shape
+
     data.lab_id = data.lab_id.astype(str)
     data.auc = data.auc.astype(float)
+
+    # in case already has call
+    if 'call' in data.columns: data = data.drop(['call'], axis='columns')
 
     #[print(f' {x}') for x in data['auc']]
     data2 = data[~pd.isnull(data['auc'])]
@@ -24,7 +29,7 @@ if __name__ == '__main__':
     assignments = pd.DataFrame(columns=['inhibitor','auc','lab_id','call'])
     for inhib in data2.inhibitor.unique():
 
-        inhib_dat = data[data['inhibitor'] == inhib]
+        inhib_dat = data2[data2['inhibitor'] == inhib]
 
         inhib_aucs = inhib_dat.auc #.unique()
 
@@ -47,3 +52,6 @@ if __name__ == '__main__':
     #print(data[['lab_id', 'inhibitor', 'auc', 'call']].head(20))
 
     data.to_csv(data_path)
+    out_shp = data.shape
+
+    print(f'input shape: {in_shp}\noutput shape: {out_shp}')
