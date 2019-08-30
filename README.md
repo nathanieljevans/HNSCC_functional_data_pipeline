@@ -23,6 +23,8 @@ $ python -W ignore sequential_processing_job.py ../plate_maps/ ../data/
 $ python combine_processed_panels.py ../output
 
 $ python patient_sensitivity_assignment.py ../output/HNSCC_all_functional_data.csv
+
+$ python predict_hermetic_transitions.py ../output/HNSCC_all_functional_data.csv ../../atypical_doseresponse_classifier/best_model/best_model.159-55.24.h5
 ```
 
 
