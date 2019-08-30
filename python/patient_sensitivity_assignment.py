@@ -21,7 +21,8 @@ if __name__ == '__main__':
     data.auc = data.auc.astype(float)
 
     # in case already has call
-    if 'call' in data.columns: data = data.drop(['call'], axis='columns')
+    if 'call' in data.columns
+    data = data.drop(['call'], axis='columns')
 
     #[print(f' {x}') for x in data['auc']]
     data2 = data[~pd.isnull(data['auc'])]

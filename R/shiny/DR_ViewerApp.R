@@ -15,13 +15,16 @@ get.dr.plot <- function(input){
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   
+  plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Dose-response Curve')  + theme(legend.position = "none") 
+  
   if (input$poly) {
-    plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + geom_smooth(method="lm",formula=y ~ poly(x, 5, raw=TRUE),color="red", se=F) + ggtitle('Dose-response Curve') 
-    
-  } else {
-    plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Dose-response Curve') 
-    
+    plt <- plt  + geom_smooth(method="lm",formula=y ~ poly(x, 5, raw=TRUE),color="red", se=F) 
+  }  
+  
+  if (input$herm) { 
+    plt <- plt + geom_vline(xintercept=log10(unique(assay.dat$hermetic_transition)), color='red')  
   }
+  # + geom_vline(xintercept=2)
 
   return (plt)
 }
@@ -53,12 +56,20 @@ get.PAC.plot <- function(input){
 get.inhib.auc.dist <- function(input) { 
   inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
   
-  print(inhib.dat %>% head())
+  #print(inhib.dat %>% head())
   
   plt <- inhib.dat %>% ggplot(aes(auc, fill=call)) + geom_histogram(bins=input$bins) + ggtitle('AUC distribution')
   
   return(plt)
   
+}
+
+get.atyp.plot <- function(input) { 
+  inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
+  
+  plt <- inhib.dat %>% ggplot(aes(x=log10(hermetic_transition))) + geom_density(alpha=0.1, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), geom='line', alpha=0.25, color='blue', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
+  
+  return(plt)
 }
 
 
@@ -80,6 +91,8 @@ server <- function(input, output, session) {
   output$table <- renderDataTable({ DT::datatable(func.dat) })
   
   output$inhib_dist <- renderPlot({ get.inhib.auc.dist(input) })
+  
+  output$inhib_atyp <- renderPlot({ get.atyp.plot(input) })
 }
 
 ui <- navbarPage("HNSCC Functional Data GUI",
@@ -90,13 +103,16 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                                           selected=NULL), 
                               selectInput('inhib', 'Inhibitor', unique(func.dat$inhibitor),
                                           selected=NULL),
-                              switchInput(inputId = 'poly', label = "Show poly", value = FALSE)
+                              tags$b('Display 5th-order polynomial fit'),
+                              switchInput(inputId = 'poly', label = "", value = FALSE),
+                              tags$b('Display predicted hermetic transition points'),
+                              switchInput(inputId = 'herm', label = "", value = FALSE)
                             ),
                             mainPanel(
                                 fluidRow(
-                                  plotOutput("dr_curve"),
-                                  DT::dataTableOutput("DR.table"), 
-                                  plotOutput('PAC_controls')
+                                  column(11, plotOutput("dr_curve")),
+                                  column(11, DT::dataTableOutput("DR.table")), 
+                                  column(11, plotOutput('PAC_controls'))
                                   )
                               )
                           )
@@ -112,7 +128,8 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                             ),
                             mainPanel(
                               fluidRow(
-                                plotOutput("inhib_dist")
+                                column(11, plotOutput("inhib_dist")), 
+                                column(11, plotOutput('inhib_atyp'))
                               )
                             )
                           )
