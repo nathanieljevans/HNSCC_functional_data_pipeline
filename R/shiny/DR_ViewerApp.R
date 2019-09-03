@@ -56,10 +56,22 @@ get.PAC.plot <- function(input){
 get.inhib.auc.dist <- function(input) { 
   inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
   
-  #print(inhib.dat %>% head())
+  if (input$hist){ 
+    if (input$grp) { 
+      plt <- inhib.dat %>% ggplot(aes(auc, fill=call)) + geom_histogram(bins=input$bins) + ggtitle('AUC distribution')
+    } else { 
+      plt <- inhib.dat %>% ggplot(aes(auc)) + geom_histogram(bins=input$bins) + ggtitle('AUC distribution')
+    }
+  } else{
+      if (input$grp) { 
+        plt <- inhib.dat %>% ggplot(aes(auc, fill=call)) + geom_density(alpha=0.2) + ggtitle('AUC distribution')
+      } else { 
+        plt <- inhib.dat %>% ggplot(aes(auc)) + geom_density() + ggtitle('AUC distribution')
+      }
   
-  plt <- inhib.dat %>% ggplot(aes(auc, fill=call)) + geom_histogram(bins=input$bins) + ggtitle('AUC distribution')
+  }
   
+
   return(plt)
   
 }
@@ -124,7 +136,11 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                                           selected=NULL), 
                               sliderInput("bins", "Number of Bins",
                                           min = 5, max = 30,
-                                          value = 20)
+                                          value = 20),
+                              tags$b('Inhibitor AUC distribution'),
+                              switchInput(inputId = 'hist', label = "hist", value = TRUE),
+                              tags$b('Group by sensitivity desgination'),
+                              switchInput(inputId = 'grp', label = "", value = FALSE)
                             ),
                             mainPanel(
                               fluidRow(
