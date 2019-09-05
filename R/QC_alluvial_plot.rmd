@@ -25,6 +25,11 @@ drug.data = read.csv('../output/HNSCC_all_functional_data.csv', as.is=T) %>% mut
 ```
 
 ```{r}
+drug.data %>% filter (prob_conv == 'False') %>% select(lab_id, inhibitor) %>% unique() %>% head(10)
+```
+
+
+```{r}
 drug.data %>% head()
 
 #drug.data %>% glimpse() 
@@ -34,13 +39,53 @@ drug.data %>% head()
 
 ```{r}
 
-viz.dat <- drug.data %>% select(lab_id, auc,low_PAC_flag, is_within_plate_repl, is_across_plate_repl, AIC_flag, DEV_flag, overfit_flag) %>% unique() %>% mutate(is.kept = !low_PAC_flag & !is_within_plate_repl & !is_across_plate_repl & !DEV_flag & !overfit_flag)
+QC_filter <- function(dat) {
+  dat <- dat %>% filter( !to_logical(low_PAC_flag) & !to_logical(is_within_plate_repl) & !to_logical(is_across_plate_repl) & !to_logical(across_plate_repl_flag) & !to_logical(AIC_flag) & !to_logical(DEV_flag))  # overfit_flag??? 
+  return(dat)
+}
+
+viz.dat <- drug.data %>% select(lab_id, auc,low_PAC_flag, is_within_plate_repl, is_across_plate_repl, AIC_flag, DEV_flag, across_plate_repl_flag) %>% unique() %>% mutate(is.kept = !low_PAC_flag & !is_within_plate_repl & !is_across_plate_repl & !DEV_flag & !as.logical(across_plate_repl_flag) )
+
+# where is within_plate_repl_flag?
+
+viz.dat.long <- viz.dat %>% gather(key = 'flag.name', value='state', -lab_id, -auc, -is.kept) 
+
+viz.dat %>% head()
+
+viz.dat %>% group_by(is.kept) %>% count()
+```
+
+```{r}
+viz.dat.long %>% ggplot(aes(x=flag.name, fill=state)) + geom_bar() + geom_text( aes(label=stat(count)), stat='count', nudge_y=0)+ theme(axis.text.x=element_text(angle=15, hjust=1)) + ggtitle('Functional Data Pipeline QC Filtering')
+
+# viz.dat.long %>% ggplot(aes(x=flag.name, y=auc, fill=state)) + geom_violin(alpha=0.1) 
+```
+
+
+```{r}
+ggplot(viz.dat,
+       aes(axis1 = low_PAC_flag, axis2 = is_within_plate_repl, axis3 = is_across_plate_repl, axis4=AIC_flag, axis5 = DEV_flag)) +
+  geom_alluvium(aes(fill = is.kept),
+                width = 0, knot.pos = 0, reverse = FALSE) +
+  geom_stratum(width = 1/8) +
+  geom_text(stat = "stratum", label.strata = TRUE) +
+  scale_x_continuous(breaks = 1:3, labels = c("Survived", "Sex", "Class")) +
+  ggtitle("Titanic survival by class and sex")
+
 ```
 
 ```{r}
 
-viz.dat %>% ggplot(aes(axis1 = low_PAC_flag, axis2 = is_within_plate_repl, axis3=is_across_plate_repl, axis4=AIC_flag, axis5=DEV_flag, aixs6=overfit_flag)) +
-  geom_alluvium(aes(fill=is.kept), width = 1/12)
+#viz.dat %>% ggplot(aes(axis1 = low_PAC_flag, axis2 = is_within_plate_repl, axis3=is_across_plate_repl, axis4=AIC_flag, axis5=DEV_flag, aixs6=overfit_flag)) + geom_alluvium(aes(fill=is.kept), width = 1/12)
+
+ggplot(viz.dat.long,
+       aes(x = flag.name, stratum = state, alluvium = is.kept,
+           fill = state, label = state)) +
+  scale_x_discrete(expand = c(.1, .1)) +
+  geom_flow() +
+  geom_stratum(alpha = .5) +
+  geom_text(stat = "alluvium", size = 3) + 
+  ggtitle("HNSCC Functional Drug Screen Pipeline QC losses")
 
 # , axis3=is_across_plate_repl, axis4=AIC_flag, axis5=DEV_flag, aixs6=overfit_flag
 ```

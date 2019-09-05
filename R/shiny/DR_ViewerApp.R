@@ -54,7 +54,7 @@ get.PAC.plot <- function(input){
 }
 
 get.inhib.auc.dist <- function(input) { 
-  inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
+  inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) ) %>% select(auc, call, lab_id, inhibitor, panel_id, plate_num) %>% unique()
   
   if (input$hist){ 
     if (input$grp) { 
