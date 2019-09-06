@@ -85,6 +85,61 @@ get.atyp.plot <- function(input) {
 }
 
 
+################################################################################
+### THIS WOULD BE BETTER, IF I COULD FIGURE OUT THE AUC PERCENTILE FUNCTION...
+################################################################################
+# get.pat.sens.plot <- function(input) { 
+# 
+#   assay.dat <- func.dat %>% QC_filter(.) %>% select(lab_id, inhibitor, auc) %>% unique()#%>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
+#   
+#   #print(head(assay.dat))
+#   
+#   assay.dat <- assay.dat %>% group_by(inhibitor) %>% mutate(auc_list = list(auc), len = length(auc_list)) %>% ungroup()
+#   assay.dat <- assay.dat %>% mutate(auc.percentile = ecdf(x=auc_list[[1]])(auc))
+# 
+#   #assay.dat <- assay.day %>% group_by(inhibitor) %>% mutate(auc.percentile = ecdf(list(auc))(auc)) %>% ungroup() 
+#   
+#   # THIS IS KINDA JANKY, to avoid having panel replicates come up twice we have to aggregate somehow, for now, I'm going to only take the larger of the two values, thereby being conservative. I'd average, but I doubt you can do that with percentiles. 
+#   dat <- assay.dat %>% filter(lab_id == input$pat2) %>% select(lab_id,inhibitor, auc.percentile) %>% group_by(lab_id, inhibitor) %>% summarize(auc.percentile=max(auc.percentile)) %>% ungroup() %>% arrange(auc.percentile) %>% head(25)   
+#   inhib_order <- dat$inhibitor
+#   
+#   #print(inhib_order)
+#   #print(dat)
+#   
+#   plt <- dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=auc.percentile)) + geom_col(alpha=0.3) + theme(axis.text.x=element_text(angle=45, hjust=1)) + ggtitle('Sample Inhibitor Sensitivity') + geom_hline(yintercept=0.2, color='red')
+#   
+#   return(plt)
+# }
+
+
+get.pat.sens.plot <- function(input) { 
+  
+  assay.dat <- func.dat %>% QC_filter(.) %>% select(lab_id, inhibitor, auc, call) %>% unique() %>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
+  
+  if (input$sens){
+    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(auc) %>% head(50)
+  } else{
+    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(desc(auc)) %>% head(50)
+  }
+  inhib_order <- dat$inhibitor
+  
+  plt <- dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=auc)) + geom_col(alpha=0.3) + theme(axis.text.x=element_text(angle=45, hjust=1)) + ggtitle('Sample Inhibitor Sensitivity')
+  
+  return(plt)
+}
+
+get.pat.sens.tab <- function(input) { 
+  assay.dat <- func.dat %>% filter(lab_id == input$pat2) %>% QC_filter(.) %>% select(lab_id, inhibitor, plate_num, panel_id, auc, call) %>% unique()#%>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
+  #print(assay.dat)
+  if (input$sens) {
+    tab <- assay.dat %>% filter(call == 'sens') %>% select(lab_id, panel_id, inhibitor, auc, call) %>% arrange(auc)
+  } else {
+    tab <- assay.dat %>% filter(call == 'res') %>% select(lab_id, panel_id, inhibitor, auc, call) %>% arrange(desc(auc))
+  }
+  return(tab)
+}
+
+
 # ----------------------------------------------------------------------------------------------
 
 func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T)
@@ -105,10 +160,14 @@ server <- function(input, output, session) {
   output$inhib_dist <- renderPlot({ get.inhib.auc.dist(input) })
   
   output$inhib_atyp <- renderPlot({ get.atyp.plot(input) })
+  
+  output$pat_sens_plot <- renderPlot({ get.pat.sens.plot(input) })
+  
+  output$pat_sens_tab <- renderDataTable({ get.pat.sens.tab(input) })
 }
 
 ui <- navbarPage("HNSCC Functional Data GUI",
-                 tabPanel("Patient-Level",
+                 tabPanel("Assay-Level",
                           sidebarLayout(
                             sidebarPanel(
                               selectInput('lab_id', 'Patient ID', unique(func.dat$lab_id),
@@ -127,6 +186,22 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                                   column(11, plotOutput('PAC_controls'))
                                   )
                               )
+                          )
+                 ),
+                 tabPanel("Patient-Level",
+                          sidebarLayout(
+                            sidebarPanel(
+                              selectInput('pat2', 'Inhibitor', unique(func.dat$lab_id),
+                                          selected=NULL), 
+                              tags$b('Sort by resistant or sensitive'),
+                              switchInput(inputId = 'sens', label = "sens", value = TRUE)
+                            ),
+                            mainPanel(
+                              fluidRow(
+                                column(11, plotOutput("pat_sens_plot")), 
+                                column(11, DT::dataTableOutput("pat_sens_tab"))
+                              )
+                            )
                           )
                  ),
                  tabPanel("Inhibitor-Level",

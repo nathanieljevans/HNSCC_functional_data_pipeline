@@ -10,6 +10,45 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 library(ggalluvial)
+library(batman)
+```
+
+
+```{r}
+QC_filter <- function(dat) {
+  dat <- dat %>% filter( !to_logical(low_PAC_flag) & !to_logical(is_within_plate_repl) & !to_logical(is_across_plate_repl) & !to_logical(across_plate_repl_flag) & !to_logical(AIC_flag) & !to_logical(DEV_flag))  # overfit_flag??? 
+  return(dat)
+}
+
+
+func.dat <- read.csv('../output/HNSCC_all_functional_data.csv', as.is=T)
+
+assay.dat <- func.dat %>% QC_filter(.) %>% select(lab_id, inhibitor, auc) %>% unique() 
+
+assay.dat <- assay.dat %>% group_by(lab_id, inhibitor) %>% summarize(auc=mean(auc)) %>% ungroup() %>% data.frame()
+
+print(nrow(assay.dat))
+print(nrow(assay.dat2))
+
+#print(rownames(assay.dat))
+
+assay.dat %>% head()
+
+assay.dat2 %>% head()
+
+assay.dat <- assay.dat %>% group_by(inhibitor) %>% mutate(auc_list = list(auc), len = length(auc_list)) %>% ungroup()
+
+assay.dat <- assay.dat %>% mutate(auc.percentile = ecdf(x=auc_list[[1]])(auc))
+
+assay.dat %>% head()
+
+dat <- assay.dat %>% filter(lab_id == 10004) %>% arrange(auc.percentile) %>% head(25)  
+inhib_order <- dat$inhibitor
+
+plt <-  dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=auc.percentile)) + geom_col(alpha=0.3) + theme(axis.text.x=element_text(angle=45, hjust=1)) + ggtitle('Functional Data Pipeline QC Filtering') + geom_hline(yintercept=0.2, color='red')
+
+plt
+  
 ```
 
 
