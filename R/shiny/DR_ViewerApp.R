@@ -229,6 +229,23 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                             )
                           )
                  ),
+                 tabPanel("Combination-Synergies",
+                          sidebarLayout(
+                            sidebarPanel(
+                              selectInput('inhib3', 'Inhibitor', unique(func.dat$inhibitor),
+                                          selected=NULL), 
+                              sliderInput("bins", "Number of Bins",
+                                          min = 5, max = 30,
+                                          value = 20)
+                            ),
+                            mainPanel(
+                              fluidRow(
+                                column(11, plotOutput("inhib_dist")), 
+                                column(11, plotOutput('inhib_atyp'))
+                              )
+                            )
+                          )
+                 ),
                  tabPanel("About",
                           fluidRow(
                             column(12,
