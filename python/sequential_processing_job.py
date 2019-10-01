@@ -8,7 +8,7 @@ import sys
 import os
 from datetime import datetime as dt
 
-DO_RAISE = False
+DO_RAISE = True
 
 if __name__ == '__main__':
     tic = dt.now()

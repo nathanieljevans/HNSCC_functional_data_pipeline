@@ -4,12 +4,76 @@ predict hermetic transition points in this data. More information can be found
 at: https://github.com/nathanieljevans/atypical_doseresponse_classifier
 '''
 
-
 import pandas as pd
 import sys
 import numpy as np
 from keras.models import load_model
 
+if __name__ == '__main__':
+
+    # data in
+    _, data_path, model_path = sys.argv
+
+    data = pd.read_csv(data_path, low_memory=False)
+    in_shp = data.shape
+
+    data.lab_id = data.lab_id.astype(str)
+    data.auc = data.auc.astype(float)
+
+    herm_df = data[['lab_id', 'inhibitor', 'conc_norm', 'cell_viab', 'plate_num', 'panel_id']]
+
+    print(herm_df.head())
+
+    # filter out all controls
+    herm_df = herm_df[~herm_df.inhibitor.isin(['DMSO', 'F-S-V', 'NONE'])]
+
+    model = load_model(model_path)
+
+    res = {x:[] for x in ['lab_id', 'inhibitor', 'plate_num', 'panel_id', 'conc_norm', 'atyp_prob']}
+    for inhib in herm_df.inhibitor.unique():
+        print(f'processing inhibitor: {inhib}', end='\r')
+        inhib_df = herm_df[herm_df.inhibitor == inhib]
+        for pat in inhib_df.lab_id.unique():
+            pat_df = inhib_df[inhib_df.lab_id == pat]
+            for pid in pat_df.panel_id.unique():
+                df_pid = pat_df[pat_df.panel_id == pid]
+                for pnum in df_pid.plate_num.unique():
+                    df = df_pid[df_pid.plate_num == pnum]
+                    #print(df)
+                    assert df.shape[0] == 7, f'wrong number of doses, should only be 7, got {df.shape[0]} [inhibitor: {inhib} | lab_id: {pat} | panel_id: {pid}] \n {df}'
+                    df = df.sort_values(by=['conc_norm'], axis=0)
+                    conc = df['conc_norm'].values
+                    viab = df['cell_viab'].values
+
+                    X = np.array([conc, viab]).reshape(-1, 2, 7, 1)
+                    #print(X.shape)
+                    #print(X)
+                    Y = model.predict(X)
+
+                    #print(Y)
+
+                    for typ, atyp, dose in zip(Y[:,0], Y[:,1], conc):
+                        res['lab_id'].append(pat)
+                        res['inhibitor'].append(inhib)
+                        res['plate_num'].append(pnum)
+                        res['panel_id'].append(pid)
+                        res['conc_norm'].append(dose)
+                        res['atyp_prob'].append(atyp / (atyp + typ))
+    print()
+    print('processing complete.')
+
+    res = pd.DataFrame(res)
+    data = data.merge(res, how='left', on=['lab_id', 'inhibitor', 'plate_num', 'panel_id', 'conc_norm'])
+    out_shp = data.shape
+
+    print(f'input shape: {in_shp}\noutput shape: {out_shp}')
+
+    data.to_csv(data_path)
+
+
+'''
+## DEPRECATED ##
+REGRESSION MODEL VVV
 if __name__ == '__main__':
 
     _, data_path, model_path = sys.argv
@@ -67,3 +131,5 @@ if __name__ == '__main__':
     print(f'input shape: {in_shp}\noutput shape: {out_shp}')
 
     data.to_csv(data_path)
+
+'''

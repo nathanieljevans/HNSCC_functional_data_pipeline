@@ -6,6 +6,7 @@
 The purpose of this script is to provide the resources to enable an automated
 analysis pipeline of functional drug response data in the HNSCC project at
 OHSU led by Shannon McWeeney and Molly Kulesz-Martin.
+
 '''
 
 import pandas as pd
@@ -18,6 +19,7 @@ import statsmodels
 import os
 import shutil
 from sklearn.preprocessing import PolynomialFeatures
+import warnings
 
 def parse_pathname(path, verbose=False):
     '''
@@ -301,6 +303,25 @@ class panel:
         '''
         self.data = self.data.assign(is_adj = self.data.cell_viab < 0, cell_viab = [0 if cv < 0 else cv for cv in self.data.cell_viab] )
 
+
+    def replicate_QC(self, method=['within','across'], flag_threshold = 1):
+        '''
+        linear regression model fit to each within-plate replicate separately
+        and AUC values are calculated. Replicates with AUC differences greater
+        than 100 are flagged. ?flag_name? [TODO] replicates are not normalized,
+        future probit calculations should use all data to fit the probit curve.
+
+        inputs
+            flag_threshold <float> : threshold to set flag for QC removal
+            method <str> : whether to average within plate or across plates.
+
+        outputs
+            none
+        '''
+
+
+
+    ### DEPRECATED ###
     def avg_plate_replicates(self, method=['within','across'], flag_threshold = 1):
         '''
         A ‘curve-free’ AUC (integration based on fine linear interpolation between
@@ -323,6 +344,7 @@ class panel:
         outputs
             none
         '''
+        warnings.warn('This method is deprecated and will be removed in future release. Use `replicate_QC()`` in the future.')
 
         n = 0
 
@@ -354,7 +376,7 @@ class panel:
                         if max(aucs) - min(aucs) > flag_threshold: toflag.append(inhib)
 
                         replicates.append(inhib)
-                        new_obs = assay.groupby(['lab_id','inhibitor','conc_norm', 'plate_num'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm', 'plate_num']).assign(within_plate_repl_flag = (max(aucs) - min(aucs)) > flag_threshold)
+                        assay.groupby(['lab_id','inhibitor','conc_norm', 'plate_num'])['cell_viab'].mean().to_frame().reset_index(level=['lab_id', 'inhibitor', 'conc_norm', 'plate_num']).assign(within_plate_repl_flag = (max(aucs) - min(aucs)) > flag_threshold)
                         avgd_obs.append(new_obs)
 
             self._log('There were %d within plate replicates [%r]' %(n, replicates))
@@ -798,16 +820,14 @@ def process(plate_path, platemap_dir = '../plate_maps/', verbose=False, do_raise
         p.normalize_cell_viability_by_negative_controls()
         print('\t\tsetting floor of zero...', end='\t\t\t\t\t\r')
         p.set_floor()
+        print('\t\tsetting ceiling of one...', end='\t\t\t\t\t\r')
+        p.set_ceiling()
         print('\t\taveraging within plate replicates...', end='\t\t\t\t\t\r')
         p.avg_plate_replicates(method='within', flag_threshold=1)
         print('\t\taveraging across plate replicates...', end='\t\t\t\t\t\r')
         p.avg_plate_replicates(method='across', flag_threshold=0.75)
-        print('\t\tsetting ceiling of 1...', end='\t\t\t\t\t\r')
-        p.set_ceiling()
         print('\t\tfitting dose response curve...', end='\t\t\t\t\t\r')
         p.fit_regressions(plot=False)
-        #print('predicting hermetic transition points...')
-        #p.predict_hermetric_transition()
         print('\t\tsetting post processing flags...', end='\t\t\t\t\t\r')
         p.post_processing_set_flags(aic_lim = 12, deviance_lim = 2)
         print('\t\twriting data to file...', end='\t\t\t\t\t\r')

@@ -7,13 +7,12 @@ library(batman)
 library(knitr)
 library(shinyWidgets)
 
-na.to.f <- function(val) { 
-  return( ifelse(val == TRUE, T, F))
-}
 
 get.dr.plot <- function(input){ 
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
+  
+  print(assay.dat)
   
   plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Dose-response Curve')  + theme(legend.position = "none") 
   
@@ -22,9 +21,9 @@ get.dr.plot <- function(input){
   }  
   
   if (input$herm) { 
-    plt <- plt + geom_vline(xintercept=log10(unique(assay.dat$hermetic_transition)), color='red')  
+    assay.dat %>% select(conc_norm, atyp_prob) %>% print(.)
+    plt <- plt + geom_col(aes(x=log10(conc_norm), y=as.numeric(atyp_prob), color='red'),alpha=0.3)
   }
-  # + geom_vline(xintercept=2)
 
   return (plt)
 }
@@ -68,12 +67,8 @@ get.inhib.auc.dist <- function(input) {
       } else { 
         plt <- inhib.dat %>% ggplot(aes(auc)) + geom_density() + ggtitle('AUC distribution')
       }
-  
   }
-  
-
   return(plt)
-  
 }
 
 get.atyp.plot <- function(input) { 
@@ -84,50 +79,24 @@ get.atyp.plot <- function(input) {
   } else {
     plt <- inhib.dat %>% ggplot(aes(x=log10(hermetic_transition))) + geom_density(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), geom='line', alpha=0.25, color='blue', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
   }
-  
   return(plt)
 }
-
-
-################################################################################
-### THIS WOULD BE BETTER, IF I COULD FIGURE OUT THE AUC PERCENTILE FUNCTION...
-################################################################################
-# get.pat.sens.plot <- function(input) { 
-# 
-#   assay.dat <- func.dat %>% QC_filter(.) %>% select(lab_id, inhibitor, auc) %>% unique()#%>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
-#   
-#   #print(head(assay.dat))
-#   
-#   assay.dat <- assay.dat %>% group_by(inhibitor) %>% mutate(auc_list = list(auc), len = length(auc_list)) %>% ungroup()
-#   assay.dat <- assay.dat %>% mutate(auc.percentile = ecdf(x=auc_list[[1]])(auc))
-# 
-#   #assay.dat <- assay.day %>% group_by(inhibitor) %>% mutate(auc.percentile = ecdf(list(auc))(auc)) %>% ungroup() 
-#   
-#   # THIS IS KINDA JANKY, to avoid having panel replicates come up twice we have to aggregate somehow, for now, I'm going to only take the larger of the two values, thereby being conservative. I'd average, but I doubt you can do that with percentiles. 
-#   dat <- assay.dat %>% filter(lab_id == input$pat2) %>% select(lab_id,inhibitor, auc.percentile) %>% group_by(lab_id, inhibitor) %>% summarize(auc.percentile=max(auc.percentile)) %>% ungroup() %>% arrange(auc.percentile) %>% head(25)   
-#   inhib_order <- dat$inhibitor
-#   
-#   #print(inhib_order)
-#   #print(dat)
-#   
-#   plt <- dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=auc.percentile)) + geom_col(alpha=0.3) + theme(axis.text.x=element_text(angle=45, hjust=1)) + ggtitle('Sample Inhibitor Sensitivity') + geom_hline(yintercept=0.2, color='red')
-#   
-#   return(plt)
-# }
 
 
 get.pat.sens.plot <- function(input) { 
   
   assay.dat <- func.dat %>% QC_filter(.) %>% select(lab_id, inhibitor, auc, call) %>% unique() %>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
   
+  assay.dat <- assay.dat %>% group_by(inhibitor) %>% mutate(AUC_z.score = scale(auc)) %>% ungroup()
+  
   if (input$sens){
-    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(auc) %>% head(50)
+    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(AUC_z.score) %>% head(input$naucs)
   } else{
-    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(desc(auc)) %>% head(50)
+    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(desc(AUC_z.score)) %>% head(input$naucs)
   }
   inhib_order <- dat$inhibitor
   
-  plt <- dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=auc)) + geom_col(alpha=0.3) + theme(axis.text.x=element_text(angle=45, hjust=1)) + ggtitle('Sample Inhibitor Sensitivity')
+  plt <- dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=AUC_z.score)) + geom_col(alpha=0.5) + theme(axis.text.x=element_text(angle=45, hjust=1)) + ggtitle('Sample Inhibitor Sensitivity')
   
   return(plt)
 }
@@ -146,8 +115,7 @@ get.pat.sens.tab <- function(input) {
 
 # ----------------------------------------------------------------------------------------------
 
-func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T)
-
+func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T) %>% mutate(atyp_prob = as.numeric(atyp_prob))
 
 server <- function(input, output, session) {
 
@@ -195,6 +163,9 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                  tabPanel("Patient-Level",
                           sidebarLayout(
                             sidebarPanel(
+                              sliderInput("naucs", "Number of inhibitors to display",
+                                                     min = 5, max = 100,
+                                                     value = 30),
                               selectInput('pat2', 'Inhibitor', unique(func.dat$lab_id),
                                           selected=NULL), 
                               tags$b('Sort by resistant or sensitive'),
@@ -229,23 +200,6 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                             )
                           )
                  ),
-                 tabPanel("Combination-Synergies",
-                          sidebarLayout(
-                            sidebarPanel(
-                              selectInput('inhib3', 'Inhibitor', unique(func.dat$inhibitor),
-                                          selected=NULL), 
-                              sliderInput("bins", "Number of Bins",
-                                          min = 5, max = 30,
-                                          value = 20)
-                            ),
-                            mainPanel(
-                              fluidRow(
-                                column(11, plotOutput("inhib_dist")), 
-                                column(11, plotOutput('inhib_atyp'))
-                              )
-                            )
-                          )
-                 ),
                  tabPanel("About",
                           fluidRow(
                             column(12,
@@ -256,4 +210,4 @@ ui <- navbarPage("HNSCC Functional Data GUI",
 )
 
 
-shinyApp(ui= ui, server= server)
+shinyApp(ui=ui, server=server)
