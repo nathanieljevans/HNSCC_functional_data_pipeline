@@ -11,8 +11,7 @@ library(shinyWidgets)
 get.dr.plot <- function(input){ 
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
-  
-  print(assay.dat)
+  print(head(assay.dat))
   
   plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Dose-response Curve')  + theme(legend.position = "none") 
   
@@ -22,7 +21,7 @@ get.dr.plot <- function(input){
   
   if (input$herm) { 
     assay.dat %>% select(conc_norm, atyp_prob) %>% print(.)
-    plt <- plt + geom_col(aes(x=log10(conc_norm), y=as.numeric(atyp_prob), color='red'),alpha=0.3)
+    plt <- plt + geom_col(aes(x=log10(conc_norm), y=atyp_prob, color='red'),alpha=0.02)
   }
 
   return (plt)
@@ -75,9 +74,9 @@ get.atyp.plot <- function(input) {
   inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
   
   if (input$grp) { 
-    plt <- inhib.dat %>% ggplot(aes(x=log10(hermetic_transition))) + geom_density(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id, color=call), geom='line', alpha=0.5, alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
+    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob)) + geom_density(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id, color=call), geom='line', alpha=0.5, alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
   } else {
-    plt <- inhib.dat %>% ggplot(aes(x=log10(hermetic_transition))) + geom_density(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), geom='line', alpha=0.25, color='blue', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
+    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob)) + geom_density(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), geom='line', alpha=0.25, color='blue', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
   }
   return(plt)
 }
@@ -114,9 +113,8 @@ get.pat.sens.tab <- function(input) {
 
 
 # ----------------------------------------------------------------------------------------------
-
 func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T) %>% mutate(atyp_prob = as.numeric(atyp_prob))
-
+print(head(func.dat))
 server <- function(input, output, session) {
 
   output$dr_curve <- renderPlot({ get.dr.plot(input) })

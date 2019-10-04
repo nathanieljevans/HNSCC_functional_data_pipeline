@@ -25,19 +25,26 @@ if __name__ == '__main__':
     print(herm_df.head())
 
     # filter out all controls
+    print(f'data length before controls filter: {herm_df.shape[0]}')
     herm_df = herm_df[~herm_df.inhibitor.isin(['DMSO', 'F-S-V', 'NONE'])]
+    print(f'data length after controls filter: {herm_df.shape[0]}')
 
     model = load_model(model_path)
 
+    n = 0
+    i = 0
     res = {x:[] for x in ['lab_id', 'inhibitor', 'plate_num', 'panel_id', 'conc_norm', 'atyp_prob']}
     for inhib in herm_df.inhibitor.unique():
-        print(f'processing inhibitor: {inhib}', end='\r')
+        #print(f'processing inhibitor: {inhib}')
         inhib_df = herm_df[herm_df.inhibitor == inhib]
         for pat in inhib_df.lab_id.unique():
+            #print(f'processing patient: {pat}')
             pat_df = inhib_df[inhib_df.lab_id == pat]
             for pid in pat_df.panel_id.unique():
+                #print(f'processing panel id: {pid}')
                 df_pid = pat_df[pat_df.panel_id == pid]
                 for pnum in df_pid.plate_num.unique():
+                    #print(f'processing panel number: {pnum}')
                     df = df_pid[df_pid.plate_num == pnum]
                     #print(df)
                     assert df.shape[0] == 7, f'wrong number of doses, should only be 7, got {df.shape[0]} [inhibitor: {inhib} | lab_id: {pat} | panel_id: {pid}] \n {df}'
@@ -48,21 +55,33 @@ if __name__ == '__main__':
                     X = np.array([conc, viab]).reshape(-1, 2, 7, 1)
                     #print(X.shape)
                     #print(X)
-                    Y = model.predict(X)
+                    Y = model.predict(X).reshape(2,7)
 
                     #print(Y)
+                    n += 1
+                    #print(Y[0,:])
+                    #print(Y[1,:])
+                    #print(conc)
+                    #x = 3/0
 
-                    for typ, atyp, dose in zip(Y[:,0], Y[:,1], conc):
+                    for typ, atyp, dose in zip(Y[0,:], Y[1,:], conc):
                         res['lab_id'].append(pat)
                         res['inhibitor'].append(inhib)
                         res['plate_num'].append(pnum)
                         res['panel_id'].append(pid)
                         res['conc_norm'].append(dose)
                         res['atyp_prob'].append(atyp / (atyp + typ))
+                        i += 1
     print()
     print('processing complete.')
 
     res = pd.DataFrame(res)
+
+    print(f'processing counter (i): {i}')
+    print(f'processing counter (n): {n}')
+
+    print(f'Results length: {res.shape[0]} [input data length: {data.shape[0]}]')
+
     data = data.merge(res, how='left', on=['lab_id', 'inhibitor', 'plate_num', 'panel_id', 'conc_norm'])
     out_shp = data.shape
 

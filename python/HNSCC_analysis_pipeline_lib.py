@@ -796,8 +796,6 @@ class panel:
 
         self.data = self.data.assign(panel_id =  assay_id)
 
-
-
 def process(plate_path, platemap_dir = '../plate_maps/', verbose=False, do_raise=False):
     '''
     This method loads a file representing a single plate assay into memory, maps plate locations to
