@@ -6,8 +6,20 @@ library(shiny)
 library(batman)
 library(knitr)
 library(shinyWidgets)
+library(shinythemes)
+
+# -------------------------------------------------------------------------------------------------------------------
+######## GLOBALS ####################################################################################################
+# -------------------------------------------------------------------------------------------------------------------
+OUR.THEME = "flatly"           # shiny theme 
+POLY.FIT.ORDER = 5             # order of "overfitted" regression on Page 1 Dose-Response Plot
+# -------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------
 
 
+# -------------------------------------------------------------------------------------------------------------------
+# Page 1: Top plot, Dose-Response plots, stratified by sensitivity 
+# -------------------------------------------------------------------------------------------------------------------
 get.dr.plot <- function(input){ 
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
@@ -16,7 +28,7 @@ get.dr.plot <- function(input){
   plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Dose-response Curve')  + theme(legend.position = "none") 
   
   if (input$poly) {
-    plt <- plt  + geom_smooth(method="lm",formula=y ~ poly(x, 5, raw=TRUE),color="red", se=F) 
+    plt <- plt  + geom_smooth(method="lm",formula=y ~ poly(x, POLY.FIT.ORDER, raw=TRUE),color="red", se=F) 
   }  
   
   if (input$herm) { 
@@ -27,6 +39,10 @@ get.dr.plot <- function(input){
   return (plt)
 }
 
+
+# -------------------------------------------------------------------------------------------------------------------
+#
+# -------------------------------------------------------------------------------------------------------------------
 get.dr.table <- function(input){ 
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
@@ -36,11 +52,28 @@ get.dr.table <- function(input){
   return (assay.dat)
 }
 
+
+# -------------------------------------------------------------------------------------------------------------------
+# QUALITY CONTROL FUNCTION
+# -------------------------------------------------------------------------------------------------------------------
+# This function is paramount in removing spurrious or duplicate observations so as not to confound visualization. 
 QC_filter <- function(dat) {
-  dat <- dat %>% filter( !to_logical(low_PAC_flag) & !to_logical(is_within_plate_repl) & !to_logical(is_across_plate_repl) & !to_logical(across_plate_repl_flag) & !to_logical(AIC_flag) & !to_logical(DEV_flag))  # overfit_flag??? 
+  true = c('TRUE')
+  false = c('FALSE','NA', '', NA)
+  dat <- dat %>% filter( low_PAC_flag %in% false & 
+                           is_within_plate_repl %in% false &
+                           is_across_plate_repl %in% false & 
+                           across_plate_repl_flag %in% false  & 
+                           AIC_flag %in% false & 
+                           DEV_flag %in% false)  
+ 
   return(dat)
 }
 
+
+# -------------------------------------------------------------------------------------------------------------------
+#
+# -------------------------------------------------------------------------------------------------------------------
 get.PAC.plot <- function(input){ 
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   filt <- assay.dat %>% select(panel_id, plate_num) %>% unique()
@@ -51,6 +84,11 @@ get.PAC.plot <- function(input){
   return(plt)
 }
 
+
+# -------------------------------------------------------------------------------------------------------------------
+# PAGE 3: AUC DISTRIBUTION 
+# -------------------------------------------------------------------------------------------------------------------
+# Generates the auc distribution, and stratfies by sensitivity; Optional to use histogram/density by user choice.
 get.inhib.auc.dist <- function(input) { 
   inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) ) %>% select(auc, call, lab_id, inhibitor, panel_id, plate_num) %>% unique()
   
@@ -70,36 +108,57 @@ get.inhib.auc.dist <- function(input) {
   return(plt)
 }
 
+
+# -------------------------------------------------------------------------------------------------------------------
+#
+# -------------------------------------------------------------------------------------------------------------------
 get.atyp.plot <- function(input) { 
   inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
   
   if (input$grp) { 
-    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob)) + geom_density(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id, color=call), geom='line', alpha=0.5, alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
+    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob, group=log10(conc_norm))) + geom_violin(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id, color=call), geom='line', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Atypical Transitions')
   } else {
-    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob)) + geom_density(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), geom='line', alpha=0.25, color='blue', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Hermetic Transitions')
+    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob, group=log10(conc_norm))) + geom_violin(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), geom='line', color='blue', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Atypical Transitions')
   }
   return(plt)
 }
 
 
+
+# -------------------------------------------------------------------------------------------------------------------
+# Page 2: Z-score Ranked Inhibitors
+# -------------------------------------------------------------------------------------------------------------------
+# 
 get.pat.sens.plot <- function(input) { 
   
-  assay.dat <- func.dat %>% QC_filter(.) %>% select(lab_id, inhibitor, auc, call) %>% unique() %>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
+  assay.dat <- func.dat %>% QC_filter(.) %>% select(lab_id, inhibitor, auc, call) %>%
+          unique() %>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% 
+          ungroup() %>% data.frame() %>% group_by(inhibitor) %>% 
+          mutate(AUC_z.score = scale(auc)) %>% ungroup()
   
-  assay.dat <- assay.dat %>% group_by(inhibitor) %>% mutate(AUC_z.score = scale(auc)) %>% ungroup()
+  this.theme <- theme(
+          axis.text.x = element_text(color = "black", size = 12, angle = 90, hjust = 1, vjust = 1, face = "plain"),
+          axis.text.y = element_text(color = "grey20", size = 12, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+          axis.title.x = element_text(color = "grey20", size = 12, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+          axis.title.y = element_text(color = "grey20", size = 12, angle = 90, hjust = .5, vjust = .5, face = "plain"))
   
   if (input$sens){
-    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(AUC_z.score) %>% head(input$naucs)
+    dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(AUC_z.score) %>% head(input$naucs) 
   } else{
     dat <- assay.dat %>% filter(lab_id == input$pat2) %>% arrange(desc(AUC_z.score)) %>% head(input$naucs)
   }
   inhib_order <- dat$inhibitor
   
-  plt <- dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=AUC_z.score)) + geom_col(alpha=0.5) + theme(axis.text.x=element_text(angle=45, hjust=1)) + ggtitle('Sample Inhibitor Sensitivity')
+  plt <- dat %>% ggplot(aes(x=factor(inhibitor, level=inhib_order), y=AUC_z.score)) + geom_col(alpha=0.5) + 
+                  this.theme + ggtitle('Sample Inhibitor Sensitivity') + xlab('Drug Name') + ylab('Relative Sensitivity (AUC Z-score)')
   
   return(plt)
 }
 
+
+# -------------------------------------------------------------------------------------------------------------------
+#
+# -------------------------------------------------------------------------------------------------------------------
 get.pat.sens.tab <- function(input) { 
   assay.dat <- func.dat %>% filter(lab_id == input$pat2) %>% QC_filter(.) %>% select(lab_id, inhibitor, plate_num, panel_id, auc, call) %>% unique()#%>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
   #print(assay.dat)
@@ -112,31 +171,67 @@ get.pat.sens.tab <- function(input) {
 }
 
 
-# ----------------------------------------------------------------------------------------------
-func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T) %>% mutate(atyp_prob = as.numeric(atyp_prob))
-print(head(func.dat))
+# -------------------------------------------------------------------------------------------------------------------
+################################## DATA QUALITY CONTROL AND PREPROCESSING ###########################################
+# -------------------------------------------------------------------------------------------------------------------
+func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T) %>% 
+                                  mutate(atyp_prob = as.numeric(atyp_prob)) %>% QC_filter()
+
+
+# -------------------------------------------------------------------------------------------------------------------
+################################## [SERVER]  OUTPT DESIGNATION  [SERVER] ############################################
+# -------------------------------------------------------------------------------------------------------------------
 server <- function(input, output, session) {
 
+  
+                                    # ---------------------------------------------------
+                                    ############## PAGE 1: ASSAY LEVEL ##################
+                                    # ---------------------------------------------------
+  # Dose response curve; stratified by sensitivity label
   output$dr_curve <- renderPlot({ get.dr.plot(input) })
   
+  # 
   output$PAC_controls <- renderPlot({ get.PAC.plot(input)})
   
   output$DR.table <- renderDataTable({ get.dr.table(input) })
   
+  
+                                    # ---------------------------------------------------
+                                    ############## PAGE 2: PATIENT LEVEL ################
+                                    # ---------------------------------------------------
   output$summary <- renderPrint({ summary(func.dat) })
   
   output$table <- renderDataTable({ DT::datatable(func.dat) })
   
+  
+                                    # ---------------------------------------------------
+                                    ############## PAGE 3: INHIBITOR LEVEL ##############
+                                    # ---------------------------------------------------
   output$inhib_dist <- renderPlot({ get.inhib.auc.dist(input) })
   
   output$inhib_atyp <- renderPlot({ get.atyp.plot(input) })
   
-  output$pat_sens_plot <- renderPlot({ get.pat.sens.plot(input) })
+  
+                                    # ---------------------------------------------------
+                                    ############## PAGE 4: ABOUT LEVEL ##################
+                                    # ---------------------------------------------------
+  # Z-score ranked inhibitor plot 
+  output$pat_sens_plot <- renderPlot({ get.pat.sens.plot(input) }, height=500)
   
   output$pat_sens_tab <- renderDataTable({ get.pat.sens.tab(input) })
 }
 
+
+# -------------------------------------------------------------------------------------------------------------------
+#####################################################################################################################
+###################################### APP STRUCTURE AND DESIGN #####################################################
+#####################################################################################################################
+# -------------------------------------------------------------------------------------------------------------------
 ui <- navbarPage("HNSCC Functional Data GUI",
+                 
+                 # ------------------------------------------------------------------------------------------------------------
+                 ############################################# ASSAY LEVEL PAGE ###############################################
+                 # ------------------------------------------------------------------------------------------------------------
                  tabPanel("Assay-Level",
                           sidebarLayout(
                             sidebarPanel(
@@ -158,12 +253,16 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                               )
                           )
                  ),
+                 
+                 # ------------------------------------------------------------------------------------------------------------
+                 ################################################ Patient Level Page  #########################################
+                 # ------------------------------------------------------------------------------------------------------------
                  tabPanel("Patient-Level",
                           sidebarLayout(
                             sidebarPanel(
                               sliderInput("naucs", "Number of inhibitors to display",
-                                                     min = 5, max = 100,
-                                                     value = 30),
+                                                     min = 5, max = 50,
+                                                     value = 20),
                               selectInput('pat2', 'Inhibitor', unique(func.dat$lab_id),
                                           selected=NULL), 
                               tags$b('Sort by resistant or sensitive'),
@@ -171,12 +270,17 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                             ),
                             mainPanel(
                               fluidRow(
-                                column(11, plotOutput("pat_sens_plot")), 
+                                column(width = 11, offset = 0, style='padding-left:0px; padding-right:0px; 
+                                       padding-top:5px; padding-bottom:150px', plotOutput("pat_sens_plot")), 
                                 column(11, DT::dataTableOutput("pat_sens_tab"))
                               )
                             )
                           )
                  ),
+                 
+                 # ---------------------------------------------------------------------------------------------------------
+                 ################################################ INHIBITOR PAGE ###########################################
+                 # ---------------------------------------------------------------------------------------------------------
                  tabPanel("Inhibitor-Level",
                           sidebarLayout(
                             sidebarPanel(
@@ -185,9 +289,9 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                               sliderInput("bins", "Number of Bins",
                                           min = 5, max = 30,
                                           value = 20),
-                              tags$b('Inhibitor AUC distribution'),
-                              switchInput(inputId = 'hist', label = "hist", value = TRUE),
-                              tags$b('Group by sensitivity desgination'),
+                              tags$b('Histogram/Density'),
+                              switchInput(inputId = 'hist', label = "", value = TRUE),
+                              tags$b('Include Sensitivity'),
                               switchInput(inputId = 'grp', label = "", value = FALSE)
                             ),
                             mainPanel(
@@ -198,6 +302,10 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                             )
                           )
                  ),
+                 
+                 # -------------------------------------------------------------------------------------------------------------
+                 ################################################ ABOUT PAGE ###################################################
+                 # -------------------------------------------------------------------------------------------------------------
                  tabPanel("About",
                           fluidRow(
                             column(12,
@@ -208,4 +316,8 @@ ui <- navbarPage("HNSCC Functional Data GUI",
 )
 
 
-shinyApp(ui=ui, server=server)
+# -------------------------------------------------------------------------------------------------------------------
+################################################ APP CALL ###########################################################
+# -------------------------------------------------------------------------------------------------------------------
+shinyApp(ui=fluidPage(theme = shinytheme(OUR.THEME), ui), 
+         server=server)
