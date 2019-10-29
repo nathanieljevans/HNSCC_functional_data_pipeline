@@ -18,14 +18,21 @@ POLY.FIT.ORDER = 5             # order of "overfitted" regression on Page 1 Dose
 
 
 # -------------------------------------------------------------------------------------------------------------------
-# Page 1: Top plot, Dose-Response plots, stratified by sensitivity 
+# Page 1: Top plot, Dose-Response plots, stratified by panel number.
 # -------------------------------------------------------------------------------------------------------------------
 get.dr.plot <- function(input){ 
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   print(head(assay.dat))
   
-  plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ geom_point(size=5) + geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Dose-response Curve')  + theme(legend.position = "none") 
+  plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ 
+                geom_point(size=5) + 
+                geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + 
+                ggtitle('Dose-response Curve')  + theme(legend.position = "none", 
+                                                        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+                                                        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain")
+                                                        ) + 
+                xlab('Concentration (Log10(uMol))') + ylab('Cell Viability')
   
   if (input$poly) {
     plt <- plt  + geom_smooth(method="lm",formula=y ~ poly(x, POLY.FIT.ORDER, raw=TRUE),color="red", se=F) 
@@ -41,13 +48,14 @@ get.dr.plot <- function(input){
 
 
 # -------------------------------------------------------------------------------------------------------------------
-#
+# PAGE 1: Dose-Response Curve Feature Table
 # -------------------------------------------------------------------------------------------------------------------
+# Provides a table for each of the dose-response's plotted, lists AUC, PAC and plate num
 get.dr.table <- function(input){ 
   
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   
-  assay.dat <- assay.dat %>% select(auc, PAC, panel_id, prob_AIC, poly_AIC, prob_deviance) %>% unique() # conc_norm, cell_viab,
+  assay.dat <- assay.dat %>% select(auc, PAC, panel_id) %>% unique() # conc_norm, cell_viab, prob_AIC, poly_AIC, prob_deviance
 
   return (assay.dat)
 }
@@ -77,7 +85,11 @@ QC_filter <- function(dat) {
 get.PAC.plot <- function(input){ 
   assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
   filt <- assay.dat %>% select(panel_id, plate_num) %>% unique()
-  PAC.dat <- func.dat %>% filter( inhibitor %in% c('DMSO', 'NONE') & lab_id == input$lab_id & panel_id %in% filt$panel_id & plate_num %in% filt$plate_num) %>% mutate(plate.id = as.factor(paste(panel_id, plate_num, sep='-')))
+  PAC.dat <- func.dat %>% filter( inhibitor %in% c('DMSO', 'NONE') & 
+                                    lab_id == input$lab_id & 
+                                    panel_id %in% filt$panel_id & 
+                                    plate_num %in% filt$plate_num) %>% 
+                  mutate(plate.id = as.factor(paste(panel_id, plate_num, sep='-')))
   
   plt <- PAC.dat %>% ggplot(aes(x=cell_viab, fill=plate.id)) + geom_density(alpha=0.2) + ggtitle('Plate Controls Distribution')
   
@@ -193,6 +205,7 @@ server <- function(input, output, session) {
   # 
   output$PAC_controls <- renderPlot({ get.PAC.plot(input)})
   
+  # Assay table display: AUC, PAC, panel.num
   output$DR.table <- renderDataTable({ get.dr.table(input) })
   
   
@@ -247,8 +260,10 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                             mainPanel(
                                 fluidRow(
                                   column(11, plotOutput("dr_curve")),
-                                  column(11, DT::dataTableOutput("DR.table")), 
-                                  column(11, plotOutput('PAC_controls'))
+                                  column(11, DT::dataTableOutput("DR.table"), style='padding-left:10px; padding-right:5px; 
+                                       padding-top:50px; padding-bottom:50px'), 
+                                  column(11, plotOutput('PAC_controls'), style='padding-left:5px; padding-right:0px; 
+                                       padding-top:0px; padding-bottom:100px')
                                   )
                               )
                           )
@@ -263,7 +278,7 @@ ui <- navbarPage("HNSCC Functional Data GUI",
                               sliderInput("naucs", "Number of inhibitors to display",
                                                      min = 5, max = 50,
                                                      value = 20),
-                              selectInput('pat2', 'Inhibitor', unique(func.dat$lab_id),
+                              selectInput('pat2', 'Lab ID (Patient)', unique(func.dat$lab_id),
                                           selected=NULL), 
                               tags$b('Sort by resistant or sensitive'),
                               switchInput(inputId = 'sens', label = "sens", value = TRUE)
