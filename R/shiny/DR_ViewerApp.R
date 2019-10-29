@@ -32,7 +32,7 @@ get.dr.plot <- function(input){
                                                         axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
                                                         axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain")
                                                         ) + 
-                xlab('Concentration (Log10(uMol))') + ylab('Cell Viability')
+                xlab('Concentration   [Log10(uMol)]') + ylab('Cell Viability (%)')
   
   if (input$poly) {
     plt <- plt  + geom_smooth(method="lm",formula=y ~ poly(x, POLY.FIT.ORDER, raw=TRUE),color="red", se=F) 
@@ -122,15 +122,26 @@ get.inhib.auc.dist <- function(input) {
 
 
 # -------------------------------------------------------------------------------------------------------------------
-#
+# PAGE 3: Predicted Atypical Transitions Per Inhibitor 
 # -------------------------------------------------------------------------------------------------------------------
 get.atyp.plot <- function(input) { 
+  #-----------------
+  ALPHA=1
+  #-----------------
   inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
   
+  atyp.plot <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob, group=log10(conc_norm))) + geom_violin(alpha=0.2, fill='red') +
+    ggtitle('Predicted Atypical Transitions') + xlab('Concentration    [Log10(uMol)]') + ylab('Cell Viability (%)')
   if (input$grp) { 
-    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob, group=log10(conc_norm))) + geom_violin(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id, color=call), geom='line', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Atypical Transitions')
-  } else {
-    plt <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob, group=log10(conc_norm))) + geom_violin(alpha=0.05, fill='red') + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), geom='line', color='blue', alpha = 0.01, se = F, method='glm', method.args=list(family=binomial(link="probit"))) + ggtitle('Predicted Atypical Transitions')
+    plt <-  atyp.plot + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + 
+                                                  panel_id, color=call), geom='line', alpha = ALPHA, 
+                                                  se = F, method='glm', method.args=list(family=binomial(link="probit"))
+                                            )
+    } else {
+    plt <- atyp.plot + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), 
+                                            geom='line', color='blue', alpha = ALPHA, se = F, method='glm', 
+                                            method.args=list(family=binomial(link="probit"))
+                                            )
   }
   return(plt)
 }
@@ -240,7 +251,7 @@ server <- function(input, output, session) {
 ###################################### APP STRUCTURE AND DESIGN #####################################################
 #####################################################################################################################
 # -------------------------------------------------------------------------------------------------------------------
-ui <- navbarPage("HNSCC Functional Data GUI",
+ui <- navbarPage("OHSU HNSCC Functional Drug Response ",
                  
                  # ------------------------------------------------------------------------------------------------------------
                  ############################################# ASSAY LEVEL PAGE ###############################################
