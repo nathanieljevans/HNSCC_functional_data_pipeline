@@ -34,6 +34,10 @@ get.dr.plot <- function(input){
                                                         ) + 
                 xlab('Concentration   [Log10(uMol)]') + ylab('Cell Viability (%)')
   
+  if (input$fix_axis){
+    plt <- plt + ylim(0,1)
+  }
+  
   if (input$poly) {
     plt <- plt  + geom_smooth(method="lm",formula=y ~ poly(x, POLY.FIT.ORDER, raw=TRUE),color="red", se=F) 
   }  
@@ -285,7 +289,9 @@ ui <- navbarPage("OHSU HNSCC Functional Drug Response ",
                               tags$b('Display 5th-order polynomial fit'),
                               switchInput(inputId = 'poly', label = "", value = FALSE),
                               tags$b('Display predicted hermetic transition points'),
-                              switchInput(inputId = 'herm', label = "", value = FALSE)
+                              switchInput(inputId = 'herm', label = "", value = FALSE), 
+                              tags$b('Fix Dose-Response Y-Axes'),
+                              switchInput(inputId = 'fix_axis', label = "", value = TRUE)
                             ),
                             mainPanel(
                                 fluidRow(
