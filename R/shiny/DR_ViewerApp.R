@@ -3,7 +3,6 @@ library(ggplot2)
 library(tidyverse)
 library(markdown)
 library(shiny)
-library(batman)
 library(knitr)
 library(shinyWidgets)
 library(shinythemes)
@@ -29,8 +28,10 @@ get.dr.plot <- function(input){
                 geom_point(size=5) + 
                 geom_smooth(color='blue', se = F, method='glm', method.args=list(family=binomial(link="probit"))) + 
                 ggtitle('Dose-response Curve')  + theme(legend.position = "none", 
-                                                        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
-                                                        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain")
+                                                        axis.title.x = element_text(color = "grey20", size = 15, 
+                                                                      angle = 0, hjust = .5, vjust = 0, face = "plain"),
+                                                        axis.title.y = element_text(color = "grey20", size = 15, 
+                                                                      angle = 90, hjust = .5, vjust = .5, face = "plain")
                                                         ) + 
                 xlab('Concentration   [Log10(uMol)]') + ylab('Cell Viability (%)')
   
@@ -215,6 +216,10 @@ get.pat.sens.tab <- function(input) {
 }
 
 
+get.download.data.frame <- function(input){
+  func.dat %>% filter(inhibitor %in% input$download_inhib) %>% select(input$download_feats) %>% unique() %>% return(.) 
+}
+
 # -------------------------------------------------------------------------------------------------------------------
 ################################## DATA QUALITY CONTROL AND PREPROCESSING ###########################################
 # -------------------------------------------------------------------------------------------------------------------
@@ -258,9 +263,18 @@ server <- function(input, output, session) {
   
   output$inhib_atyp <- renderPlot({ get.atyp.plot(input) })
   
-  
                                     # ---------------------------------------------------
                                     ############## PAGE 4: ABOUT LEVEL ##################
+                                    # ---------------------------------------------------
+  
+  output$download_summary_table <- renderDataTable({get.download.data.frame(input)})
+  output$downloadData <- downloadHandler(
+    filename = function(){'HNSCC_functional_data.csv'},
+    content = function(file) {write.csv(get.download.data.frame(input), file, row.names = FALSE)}
+  )
+
+                                    # ---------------------------------------------------
+                                    ############## PAGE 5: ABOUT LEVEL ##################
                                     # ---------------------------------------------------
   # Z-score ranked inhibitor plot 
   output$pat_sens_plot <- renderPlot({ get.pat.sens.plot(input) }, height=500)
@@ -355,6 +369,27 @@ ui <- navbarPage("OHSU HNSCC Functional Drug Response ",
                               )
                             )
                           )
+                 ),
+                 # -------------------------------------------------------------------------------------------------------------
+                 ################################################ DOWNLOAD PAGE ################################################
+                 # -------------------------------------------------------------------------------------------------------------
+                
+                 tabPanel("Download Page", 
+                 sidebarLayout(
+                   sidebarPanel(multiInput(inputId='download_inhib', label='Choose Inhibitors', choices = unique(func.dat$inhibitor), selected = NULL,
+                                           options = NULL, width = NULL, choiceNames = NULL,
+                                           choiceValues = NULL), 
+                                multiInput(inputId='download_feats', label='Choose Features', choices = colnames(func.dat), selected = c('lab_id','inhibitor','auc'),
+                                           options = NULL, width = NULL, choiceNames = NULL,
+                                           choiceValues = NULL), 
+                     downloadButton("downloadData", "Download")
+                   ),
+                   mainPanel(
+                     fluidRow(
+                       column(11, DT::dataTableOutput("download_summary_table"))
+                 )
+                 )
+                 )
                  ),
                  
                  # -------------------------------------------------------------------------------------------------------------
