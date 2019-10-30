@@ -125,25 +125,12 @@ get.inhib.auc.dist <- function(input) {
 # PAGE 3: Predicted Atypical Transitions Per Inhibitor 
 # -------------------------------------------------------------------------------------------------------------------
 get.atyp.plot <- function(input) { 
-  #-----------------
-  ALPHA=1
-  #-----------------
   inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
   
-  atyp.plot <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob, group=log10(conc_norm))) + geom_violin(alpha=0.2, fill='red') +
+  atyp.plot <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=atyp_prob, group=log10(conc_norm))) + geom_boxplot(alpha=0.2, fill='red') + geom_point(alpha=0.2) +
     ggtitle('Predicted Atypical Transitions') + xlab('Concentration    [Log10(uMol)]') + ylab('Cell Viability (%)')
-  if (input$grp) { 
-    plt <-  atyp.plot + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + 
-                                                  panel_id, color=call), geom='line', alpha = ALPHA, 
-                                                  se = F, method='glm', method.args=list(family=binomial(link="probit"))
-                                            )
-    } else {
-    plt <- atyp.plot + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), 
-                                            geom='line', color='blue', alpha = ALPHA, se = F, method='glm', 
-                                            method.args=list(family=binomial(link="probit"))
-                                            )
-  }
-  return(plt)
+  
+  return(atyp.plot)
 }
 
 
@@ -178,6 +165,36 @@ get.pat.sens.plot <- function(input) {
   return(plt)
 }
 
+# -------------------------------------------------------------------------------------------------------------------
+# PAGE 3 INHIBITOR DOSE-RESPONSE CURVES; Stratified by sensitivity [optional]
+# -------------------------------------------------------------------------------------------------------------------
+get.inhib.dr.curves <- function(input){
+  #-----------------
+  ALPHA=1
+  #-----------------
+  inhib.dat <- func.dat %>% filter(inhibitor == input$inhib2 & !is.na(inhibitor) )
+  label.conc.val <- inhib.dat$conc_norm %>% unique() %>% .[6]
+  dr.plot <- inhib.dat %>% ggplot(aes(x=log10(conc_norm), y=cell_viab, group=log10(conc_norm))) + 
+    ggtitle('Inhibitor Dose-Response Curves') + xlab('Concentration    [Log10(uMol)]') + ylab('Cell Viability (%)') 
+  
+  if (input$add_label){
+    dr.plot <- dr.plot + geom_text(data=filter(inhib.dat, conc_norm == label.conc.val), aes(label = lab_id), angle = -45, nudge_y=-.05)
+  }
+  if (input$grp) { 
+    plt <-  dr.plot + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + 
+                                          panel_id, color=call), geom='line', alpha = ALPHA, 
+                                    se = F, method='glm',  method.args=list(family=binomial(link="probit"))
+                                      
+    )
+  } else {
+    plt <- dr.plot + stat_smooth(aes(x=log10(conc_norm), y=cell_viab, group=lab_id + panel_id), 
+                                   geom='line', color='blue', alpha = ALPHA, se = F, method='glm', 
+                                   method.args=list(family=binomial(link="probit"))
+    )
+  }
+  return(plt)
+  
+}
 
 # -------------------------------------------------------------------------------------------------------------------
 #
@@ -232,6 +249,8 @@ server <- function(input, output, session) {
                                     ############## PAGE 3: INHIBITOR LEVEL ##############
                                     # ---------------------------------------------------
   output$inhib_dist <- renderPlot({ get.inhib.auc.dist(input) })
+  
+  output$inhib_dr_curves <- renderPlot({ get.inhib.dr.curves(input) })
   
   output$inhib_atyp <- renderPlot({ get.atyp.plot(input) })
   
@@ -318,11 +337,14 @@ ui <- navbarPage("OHSU HNSCC Functional Drug Response ",
                               tags$b('Histogram/Density'),
                               switchInput(inputId = 'hist', label = "", value = TRUE),
                               tags$b('Include Sensitivity'),
-                              switchInput(inputId = 'grp', label = "", value = FALSE)
+                              switchInput(inputId = 'grp', label = "", value = FALSE),
+                              tags$b('Label Curves'),
+                              switchInput(inputId = 'add_label', label = "", value = FALSE)
                             ),
                             mainPanel(
                               fluidRow(
-                                column(11, plotOutput("inhib_dist")), 
+                                column(11, plotOutput("inhib_dist")),
+                                column(11, plotOutput("inhib_dr_curves")),
                                 column(11, plotOutput('inhib_atyp'))
                               )
                             )
