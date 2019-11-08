@@ -169,10 +169,13 @@ class panel:
         self.msg_log = ''
         self._log('\n--------------------------------------------------------------------------\nThis is the message log for: \n\tlab_id: %s\n\tversion_id: %s\n\tnotes: %s\n--------------------------------------------------------------------------' %(lab_id, version_id, notes))
 
-        assert len(lab_id) == 5, 'lab_id is expected to be 5 characters long'
+        assert len(lab_id) <= 5, 'lab_id is expected to be 5 or less characters long'
+        if len(lab_id) < 5: 
+            print('Warning: lab_id is less than 5 characters long; appending 0 prefix')
+            lab_id = '0'*(5-len(lab_id)) + lab_id
         self.lab_id = lab_id
 
-        assert version_id in ['OHSU_HNSCC_derm001', 'OHSU_HNSCC_derm002'], 'unknown platemap ID, please double check pathname or update script with acceptable plate IDs'
+        #assert version_id in ['OHSU_HNSCC_derm001', 'OHSU_HNSCC_derm002'], 'unknown platemap ID, please double check pathname or update script with acceptable plate IDs'
         self.version_id = version_id
 
         assert norm in ['blank490', '490', 'Blank490'], 'improper pathname value for "norm" [blank490, 490]'

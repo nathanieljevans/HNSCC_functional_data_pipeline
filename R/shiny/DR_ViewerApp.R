@@ -21,8 +21,7 @@ POLY.FIT.ORDER = 5             # order of "overfitted" regression on Page 1 Dose
 # -------------------------------------------------------------------------------------------------------------------
 get.dr.plot <- function(input){ 
   
-  assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
-  print(head(assay.dat))
+  assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) 
   
   plt <- assay.dat %>% ggplot(aes(x=log10(conc_norm) , y=cell_viab, group=panel_id, shape=as.factor(panel_id)))+ 
                 geom_point(size=5) + 
@@ -44,7 +43,6 @@ get.dr.plot <- function(input){
   }  
   
   if (input$herm) { 
-    assay.dat %>% select(conc_norm, atyp_prob) %>% print(.)
     plt <- plt + geom_col(aes(x=log10(conc_norm), y=atyp_prob, color='red'),alpha=0.02)
   }
 
@@ -58,7 +56,7 @@ get.dr.plot <- function(input){
 # Provides a table for each of the dose-response's plotted, lists AUC, PAC and plate num
 get.dr.table <- function(input){ 
   
-  assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) %>% QC_filter(.) 
+  assay.dat <- func.dat %>% filter(inhibitor == input$inhib & lab_id == input$lab_id) 
   
   assay.dat <- assay.dat %>% select(auc, PAC, panel_id) %>% unique() # conc_norm, cell_viab, prob_AIC, poly_AIC, prob_deviance
 
@@ -206,7 +204,6 @@ get.inhib.dr.curves <- function(input){
 # -------------------------------------------------------------------------------------------------------------------
 get.pat.sens.tab <- function(input) { 
   assay.dat <- func.dat %>% filter(lab_id == input$pat2) %>% QC_filter(.) %>% select(lab_id, inhibitor, plate_num, panel_id, auc, call) %>% unique()#%>% group_by(lab_id, inhibitor) %>% summarize(auc = mean(auc)) %>% ungroup() %>% data.frame()
-  #print(assay.dat)
   if (input$sens) {
     tab <- assay.dat %>% filter(call == 'sens') %>% select(lab_id, panel_id, inhibitor, auc, call) %>% arrange(auc)
   } else {
@@ -223,9 +220,7 @@ get.download.data.frame <- function(input){
 # -------------------------------------------------------------------------------------------------------------------
 ################################## DATA QUALITY CONTROL AND PREPROCESSING ###########################################
 # -------------------------------------------------------------------------------------------------------------------
-func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T) %>% 
-                                  mutate(atyp_prob = as.numeric(atyp_prob)) %>% QC_filter()
-
+func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T)# %>% mutate(atyp_prob=as.numeric(atyp_prob)) %>% QC_filter()
 
 # -------------------------------------------------------------------------------------------------------------------
 ################################## [SERVER]  OUTPT DESIGNATION  [SERVER] ############################################
