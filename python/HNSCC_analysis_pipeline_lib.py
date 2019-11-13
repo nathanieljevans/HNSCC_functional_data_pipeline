@@ -453,6 +453,18 @@ class panel:
 
         else:
             raise 'choose a proper averaging method [within, across] plates'
+    
+    def _get_rectangle_auc(self, x, y): 
+        '''
+        This is used when regression fit fails due to perfect separation. Using left-shifted rectangles.  
+        
+        x should be log10 transformed concentration 
+        y should be cell viab [0,1]
+        '''
+        delta = (np.max(x) - np.min(x))/(len(y)-1)
+        auc = np.sum([delta * yy for yy in  y[1:]])
+        #print(f'rectangular auc calc: %s' %auc)
+        return auc
 
     def _get_lin_auc(self, df, plot=False, return_fig=False):
         '''
@@ -466,31 +478,45 @@ class panel:
             auc <float> area under the curve
         '''
         assert df.shape[0] == 7, 'There should only be 7 observations per replicate'
-
+        skip_auc_calc=False
+        
         x = [np.log10(x) for x in df['conc_norm'].values]
         y = df['cell_viab'].values
 
         pr = sm.GLM(y, sm.add_constant(x))
-        glm_res = pr.fit()
+        
+        try: 
+            glm_res = pr.fit()
+        except ValueError: 
+            try: 
+                glm_res = pr.fit(method='newton')
+            except sm.tools.sm_exceptions.PerfectSeparationError: 
+                auc = self._get_rectangle_auc(x,y)
+                self._log('Perfect separtion in linear regression: auc calculated by rectangular approximation. AUC=%.3f' %auc)
+                skip_auc_calc=True
 
         # AUC calculation -----------------------------------------------------
         # left rectangle auc estimate
-        delta = 0.001
-        x2 = np.arange(np.log10(min(df['conc_norm'].values)), np.log10(max(df['conc_norm'].values)), delta)
-        yhat = glm_res.predict(sm.add_constant(x2))
-        auc = np.sum(yhat*delta)
+        if not skip_auc_calc: 
+            delta = 0.001
+            x2 = np.arange(np.log10(min(df['conc_norm'].values)), np.log10(max(df['conc_norm'].values)), delta)
+            yhat = glm_res.predict(sm.add_constant(x2))
+            auc = np.sum(yhat*delta)
 
-        f = plt.figure(figsize = (10,10))
-        plt.title('Linear Regression [AUC=%.2f]' %auc)
-        plt.plot(x, y, 'ro', label='replicate')
-        plt.plot(x2, yhat, 'g-', label='fit')
-        plt.legend()
-        if plot: plt.show()
+            f = plt.figure(figsize = (10,10))
+            plt.title('Linear Regression [AUC=%.2f]' %auc)
+            plt.plot(x, y, 'ro', label='replicate')
+            plt.plot(x2, yhat, 'g-', label='fit')
+            plt.legend()
+            if plot: plt.show()
 
-        if return_fig: return auc, f
-        else:
-            plt.close(f)
-            return auc
+            if return_fig: return auc, f
+            else:
+                plt.close(f)
+        
+        return auc
+        
+        
 
     def set_ceiling(self):
         '''
@@ -728,9 +754,17 @@ class panel:
         '''
 
         '''
-        dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
-        with open(dirout + '/output.logs', 'w') as f:
-            f.write(self.msg_log)
+        try:         
+            dirout = './%s/%s' %(output_dir, self.plate_path[:-5].split('/')[-1])
+            with open(dirout + '/output.logs', 'w') as f:
+                f.write(self.msg_log)
+        except FileNotFoundError: 
+            if not os.path.isdir('./' + output_dir):
+                os.mkdir(output_dir)
+                os.mkdir(dirout)
+                with open(dirout + '/output.logs', 'w') as f:
+                    f.write(self.msg_log)
+                
 
     def write_data_to_file(self, output_dir='../output'):
         '''

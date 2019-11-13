@@ -20,7 +20,7 @@ from keras.models import load_model
 ##############################################################################
 
 ERASE_OUTPUT_DIR = True
-DO_RAISE = True # raise exceptions in sequential processing job
+DO_RAISE = False # raise exceptions in sequential processing job
 
 PLATEMAP_DIR = '../plate_maps/'
 RAW_DATA_DIR = '../data/'
@@ -37,12 +37,14 @@ ATYP_CLASSIFIER_MODEL_PATH = '../../atypical_doseresponse_classifier/python/clas
 ##############################################################################
 #                         house keeping                                      #
 ##############################################################################
-
 print('###########################################')
 print('###########################################')
+      
+print('Non-critical exceptions during processing will not be raised: %s' %str(DO_RAISE))
 print(f'removing output directory: {ERASE_OUTPUT_DIR}')
-if ERASE_OUTPUT_DIR: 
-    shutil.rmtree(OUTPUT_DIR)
+
+if ERASE_OUTPUT_DIR and os.path.isdir(OUTPUT_DIR): 
+    shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
     
 print('###########################################')
 print('###########################################')
