@@ -40,7 +40,7 @@ ATYP_CLASSIFIER_MODEL_PATH = '../../atypical_doseresponse_classifier/python/clas
 print('###########################################')
 print('###########################################')
       
-print('Non-critical exceptions during processing will not be raised: %s' %str(DO_RAISE))
+print('Non-critical exceptions during processing will be raised: %s' %str(DO_RAISE))
 print(f'removing output directory: {ERASE_OUTPUT_DIR}')
 
 if ERASE_OUTPUT_DIR and os.path.isdir(OUTPUT_DIR): 
