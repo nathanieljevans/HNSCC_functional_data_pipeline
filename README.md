@@ -29,7 +29,7 @@ $ python predict_hermetic_transitions.py ../output/HNSCC_all_functional_data.csv
 $ python add_manual_annotations.py
 ```
 
-See [readme](./annotations/) for more information on `adding manual annotation`. 
+See [readme](./annotation/) for more information on `adding manual annotation`. 
 
 
 # Data Dictionary 
