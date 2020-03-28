@@ -20,7 +20,7 @@ from keras.models import load_model
 ##############################################################################
 
 ERASE_OUTPUT_DIR = True     # careful with this. 
-DO_RAISE = True             # raise exceptions in sequential processing job. 
+DO_RAISE = False             # raise exceptions in sequential processing job. 
 
 PLATEMAP_DIR = '../plate_maps/'
 RAW_DATA_DIR = '../data/'
@@ -57,7 +57,7 @@ print('Running sequential processing job...')
 tic = dt.now()
 _, map_dir, data_dir = None, PLATEMAP_DIR, RAW_DATA_DIR
 
-dirlist = os.listdir(data_dir)[0:3]
+dirlist = os.listdir(data_dir)
 print(dirlist)
 failures = []
 errors = []
@@ -243,3 +243,13 @@ data.to_csv(data_path)
 print('atypical predictions complete.')
 print('###########################################')
 print('###########################################')
+
+##############################################################################
+#                         add annotations                                    #
+##############################################################################
+
+
+
+##############################################################################
+#                         final data cleaning                                #
+##############################################################################
