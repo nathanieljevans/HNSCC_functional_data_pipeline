@@ -27,7 +27,11 @@ $ python patient_sensitivity_assignment.py ../output/HNSCC_all_functional_data.c
 $ python predict_hermetic_transitions.py ../output/HNSCC_all_functional_data.csv ../../atypical_doseresponse_classifier/best_model/best_model.159-55.24.h5
 
 $ python add_manual_annotations.py
+
+$ python filter_output_data.py
 ```
+
+Final `cleaned` data will be available in the `./outputs/` directory. 
 
 See [readme](./annotation/) for more information on `adding manual annotation`. 
 
