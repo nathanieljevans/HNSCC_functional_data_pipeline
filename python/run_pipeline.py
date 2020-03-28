@@ -19,8 +19,8 @@ from keras.models import load_model
 #                              globals                                       #
 ##############################################################################
 
-ERASE_OUTPUT_DIR = True
-DO_RAISE = False # raise exceptions in sequential processing job
+ERASE_OUTPUT_DIR = True     # careful with this. 
+DO_RAISE = True             # raise exceptions in sequential processing job. 
 
 PLATEMAP_DIR = '../plate_maps/'
 RAW_DATA_DIR = '../data/'
@@ -57,7 +57,8 @@ print('Running sequential processing job...')
 tic = dt.now()
 _, map_dir, data_dir = None, PLATEMAP_DIR, RAW_DATA_DIR
 
-dirlist = os.listdir(data_dir)
+dirlist = os.listdir(data_dir)[0:3]
+print(dirlist)
 failures = []
 errors = []
 

@@ -12,6 +12,8 @@ library(shinythemes)
 # -------------------------------------------------------------------------------------------------------------------
 OUR.THEME = "flatly"           # shiny theme 
 POLY.FIT.ORDER = 5             # order of "overfitted" regression on Page 1 Dose-Response Plot
+OUTPUT_PATH = '../../output/HNSCC_all_functional_data.csv'
+FILTER_DATA = TRUE             # Filter based on QC flags 
 # -------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -69,14 +71,14 @@ get.dr.table <- function(input){
 # -------------------------------------------------------------------------------------------------------------------
 # This function is paramount in removing spurrious or duplicate observations so as not to confound visualization. 
 QC_filter <- function(dat) {
-  true = c('TRUE')
-  false = c('FALSE','NA', '', NA)
-  dat <- dat %>% filter( low_PAC_flag %in% false & 
-                           is_within_plate_repl %in% false &
-                           is_across_plate_repl %in% false & 
-                           across_plate_repl_flag %in% false  & 
-                           AIC_flag %in% false & 
-                           DEV_flag %in% false)  
+  #true = c('TRUE')
+  #false = c('FALSE','NA', '', NA)
+  dat <- dat %>% filter( (low_PAC_flag != 'TRUE') & 
+                           (is_within_plate_repl != 'TRUE') &
+                           (is_across_plate_repl != 'TRUE') & 
+                           (across_plate_repl_flag != 'TRUE')  & 
+                           (AIC_flag != 'TRUE') & 
+                           (DEV_flag != 'TRUE'))  
  
   return(dat)
 }
@@ -94,7 +96,7 @@ get.PAC.plot <- function(input){
                                     plate_num %in% filt$plate_num) %>% 
                   mutate(plate.id = as.factor(paste(panel_id, plate_num, sep='-')))
   
-  plt <- PAC.dat %>% ggplot(aes(x=cell_viab, fill=plate.id)) + geom_density(alpha=0.2) + ggtitle('Plate Controls Distribution')
+  plt <- PAC.dat %>% ggplot(aes(x=cell_viab, fill=plate.id)) + geom_density(alpha=0.2) + geom_rug(alpha=0.25) + ggtitle('Plate Controls Distribution') + xlim(0,2)
   
   return(plt)
 }
@@ -220,7 +222,10 @@ get.download.data.frame <- function(input){
 # -------------------------------------------------------------------------------------------------------------------
 ################################## DATA QUALITY CONTROL AND PREPROCESSING ###########################################
 # -------------------------------------------------------------------------------------------------------------------
-func.dat <- read.csv('../../output/HNSCC_all_functional_data.csv', as.is=T)# %>% mutate(atyp_prob=as.numeric(atyp_prob)) %>% QC_filter()
+func.dat <- read.csv(OUTPUT_PATH, as.is=T) 
+if (FILTER_DATA) { 
+  func.dat <- func.dat %>% QC_filter()
+}
 
 # -------------------------------------------------------------------------------------------------------------------
 ################################## [SERVER]  OUTPT DESIGNATION  [SERVER] ############################################

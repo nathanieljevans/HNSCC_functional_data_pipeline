@@ -329,7 +329,7 @@ class panel:
         '''
         A ‘curve-free’ AUC (integration based on fine linear interpolation between
         the 7 data points themselves) was calculated for those runs with within-panel
-        replicates after applying a ceiling of 100 for the normalized_viability.
+        replicates after applying a ceiling of 1 for the normalized_viability.
         The maximum change in AUC amongst the replicates was noted and those runs
         with differences > 1 were removed.
 
@@ -530,7 +530,8 @@ class panel:
             none
         '''
         self._log('Applying a ceiling of 1 to cell viability...')
-        self.data = self.data.assign(cell_viab = [1 if cv > 1 else cv for cv in self.data.cell_viab])
+        self.data.loc[(self.data.cell_viab > 1) & (~self.data.inhibitor.isin(['NONE','DMSO','F-S-V'])), 'cell_viab'] = 1
+        #self.data = self.data.assign(cell_viab = [1 if (cv > 1 and inhib not in ['NONE','DMSO','F-S-V']) else cv for cv, inhib in self.data[['cell_viab', 'inhibitor']].values])
 
     def fit_probit(self, inhib, x, y, df, res, failures, plot=True):
         '''
