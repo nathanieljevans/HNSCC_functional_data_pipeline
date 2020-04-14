@@ -6,6 +6,5 @@
 /output/
 /beatAML_data/
 
-
-# Don't include trematenib data 
-./Trematinib-Combo-CI/data/*
+# Don't include trametenib data 
+/Trematinib-Combo-CI/data/*
