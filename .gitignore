@@ -5,3 +5,7 @@
 # local output is trivial 
 /output/
 /beatAML_data/
+
+
+# Don't include trematenib data 
+./Trematinib-Combo-CI/data/*
