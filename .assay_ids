@@ -1,24 +1,20 @@
 ../data//lab_id=10004-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 1
-../data//lab_id=10139-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 2
-../data//lab_id=10308-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 3
-../data//lab_id=10309-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=matched normal 10308.xlsx : 4
-../data//lab_id=10314-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 5
-../data//lab_id=10320-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 6
-../data//lab_id=10320-norm=blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 7
-../data//lab_id=10326-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 8
-../data//lab_id=10326-norm=blank490-plate_version_id=OHSU_HNSCC_derm002-note=(2).xlsx : 9
-../data//lab_id=10326-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 10
-../data//lab_id=10328-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=(2).xlsx : 11
-../data//lab_id=10328-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 12
-../data//lab_id=10329-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 13
-../data//lab_id=10336-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 14
-../data//lab_id=10336-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=(2).xlsx : 15
+../data//lab_id=10021-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 2
+../data//lab_id=10054-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 3
+../data//lab_id=10058-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 4
+../data//lab_id=10139-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 5
+../data//lab_id=10159-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 6
+../data//lab_id=10205-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 7
+../data//lab_id=10250-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 8
+../data//lab_id=10289-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 9
+../data//lab_id=10290-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 10
+../data//lab_id=10292-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 11
+../data//lab_id=10308-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 12
+../data//lab_id=10314-norm=Blank490-plate_version_id=OHSU_HNSCC_derm001-note=NA.xlsx : 13
+../data//lab_id=10320-norm=blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 14
+../data//lab_id=10326-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 15
 ../data//lab_id=10336-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 16
 ../data//lab_id=10348-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 17
-../data//lab_id=10348-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=REDO.xlsx : 18
-../data//lab_id=20003-norm=blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 19
-../data//lab_id=20004-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 20
-../data//lab_id=8020-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=vs.2 early.xlsx : 21
-../data//lab_id=8020-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=vs.2 early.xlsx : 22
-../data//lab_id=8020-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=vs.2 late.xlsx : 23
-../data//lab_id=10356-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=plate 7 is a duplicate plate 4.xlsx : 24
+../data//lab_id=10356-norm=Blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 18
+../data//lab_id=10404-norm=Blank490-plate_version_id=OHSU_HNSCC_derm003-note=NA.xlsx : 19
+../data//lab_id=20003-norm=blank490-plate_version_id=OHSU_HNSCC_derm002-note=NA.xlsx : 20

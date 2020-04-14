@@ -14,18 +14,20 @@ import pandas as pd
 import numpy as np
 import shutil
 from keras.models import load_model
+import argparse
 
 ##############################################################################
 #                              globals                                       #
 ##############################################################################
 
-ERASE_OUTPUT_DIR = True     # careful with this. 
-DO_RAISE = False             # raise exceptions in sequential processing job. 
+REPROCESS = True             # careful with this, all previously processed data will be erased including assay ids.  
+DO_RAISE = False          # raise exceptions in sequential processing job. 
 
 PLATEMAP_DIR = '../plate_maps/'
 RAW_DATA_DIR = '../data/'
 
 OUTPUT_DIR = '../output'
+ASSAYID_PATH = '../.assay_ids'
 
 SENSITIVE_QUANTILE = 0.2
 RESISTSNT_QUANTILE = 0.8
@@ -37,34 +39,47 @@ ATYP_CLASSIFIER_MODEL_PATH = '../../atypical_doseresponse_classifier/python/clas
 ##############################################################################
 #                         house keeping                                      #
 ##############################################################################
-print('###########################################')
-print('###########################################')
+
+print('-------------------------------------------------------------')
       
 print('Non-critical exceptions during processing will be raised: %s' %str(DO_RAISE))
-print(f'removing output directory: {ERASE_OUTPUT_DIR}')
+print(f'removing output directory & reprocessing: {REPROCESS}')
 
-if ERASE_OUTPUT_DIR and os.path.isdir(OUTPUT_DIR): 
+if REPROCESS and os.path.isdir(OUTPUT_DIR): 
     shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
-    
-print('###########################################')
-print('###########################################')
-
-##############################################################################
-#                         sequntial_processing_job.py                        #
-##############################################################################
-print('Running sequential processing job...')
+    open(ASSAYID_PATH, 'w').close()
 
 tic = dt.now()
 _, map_dir, data_dir = None, PLATEMAP_DIR, RAW_DATA_DIR
 
 dirlist = os.listdir(data_dir)
-print(dirlist)
+
+if not REPROCESS: 
+    started = [x for x in os.listdir(OUTPUT_DIR) if os.path.isdir(OUTPUT_DIR + '/' + x)]
+
+    already_processed = []
+    for x in started: 
+        if "HNSCC_processed_functional_data.csv" in os.listdir(OUTPUT_DIR + '/' + x):
+            already_processed.append(x)
+        else: 
+            print(f'{x} - not completed, removing directory.')
+            shutil.rmtree(OUTPUT_DIR + '/' + x, ignore_errors=True)
+
+    print(f'number of files already processed: {len(already_processed)}')
+    to_process = set(dirlist) - set(already_processed)
+    print(f'number of files to process: {len(to_process)}')
+else: 
+    already_processed = []
+    to_process = dirlist
+
+print('-------------------------------------------------------------')
+
 failures = []
 errors = []
 
-for i,p in enumerate(dirlist):
+for i,p in enumerate(to_process):
     try:
-        print('Panels processed: [%d/%d]' %(i, len(dirlist)))
+        print('Panels processed: [%d/%d]' %(i + len(already_processed), len(dirlist)))
         process(data_dir + '/' + p, platemap_dir=map_dir, verbose=False, do_raise=DO_RAISE)
     except Exception as e:
         print('Processing failed. See error log for details.')

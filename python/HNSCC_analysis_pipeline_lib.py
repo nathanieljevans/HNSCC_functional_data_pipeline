@@ -21,7 +21,7 @@ import shutil
 from sklearn.preprocessing import PolynomialFeatures
 import warnings
 
-def parse_pathname(path, verbose=False):
+def parse_pathname(path, verbose=False, path_sep='/'):
     '''
     parse relevant information from data path, must return
         - lab_id [unique 5 digit patient identifier]
@@ -32,19 +32,21 @@ def parse_pathname(path, verbose=False):
         lab_id=XXXXX-norm=XXXXXX-plate_version_id=XXXXX.xlsx
 
     '''
+    if verbose: print('path', path)
 
-    name = path.split('/')[-1][:-5].split('-')
+
+    name = path.split(path_sep)[-1][:-5].split('-')
 
     labels = [n.split('=')[0] for n in name]
     values = [n.split('=')[-1] for n in name]
 
-    assert len(labels) == 4, 'parsing error: atypical pathname - labels require: lab_id, norm, version_id, note'
-    assert len(values) == 4, 'parsing error: atypical pathname - values require 4 inputs for each label.'
+    assert len(labels) == 4, 'parsing error: atypical pathname - labels require: lab_id, norm, version_id, note - got: ' + str(labels)
+    assert len(values) == 4, 'parsing error: atypical pathname - values require 4 inputs for each label. - got:' + str(values)
 
     if verbose: lab_id, norm, version_id, notes = values
     if verbose: print('---------------------------------------------------------')
     if verbose: print( 'please double check file name parsing is accurate')
-    if verbose: print( 'file name: %s' %data_path.split('/')[-1])
+    if verbose: print( 'file name: %s' %path.split(path_sep)[-1])
     if verbose: print('lab_id: %s' %lab_id)
     if verbose: print('norm: %s' %norm)
     if verbose: print('version_id: %s' %version_id)
@@ -155,7 +157,7 @@ class panel:
     '''
     This class represents a single HNSCC drug panel.
     '''
-    def __init__(self, plate_path, platemap_dir, verbose=True):
+    def __init__(self, plate_path, platemap_dir, verbose=True, path_sep='/'):
         '''
         parse path name, load plate data, load plate map, check positive control
         '''
@@ -164,7 +166,7 @@ class panel:
         self.platemap_dir = platemap_dir
         self.verbose = verbose
 
-        lab_id, norm, version_id, notes = parse_pathname(plate_path)
+        lab_id, norm, version_id, notes = parse_pathname(plate_path,verbose=verbose, path_sep=path_sep)
 
         self.msg_log = ''
         self._log('\n--------------------------------------------------------------------------\nThis is the message log for: \n\tlab_id: %s\n\tversion_id: %s\n\tnotes: %s\n--------------------------------------------------------------------------' %(lab_id, version_id, notes))
@@ -251,9 +253,13 @@ class panel:
         '''
 
         '''
+
         self._log('mapping data... [%s]' %self.version_id)
         self.data = self._raw.merge(self.platemap, how='left', left_on=['plate_row','plate_col','plate_num'], right_on=['row','col','plate_number']).drop(['row','col','plate_number'], axis='columns')
 
+        self.data = self.data[~self.data.inhibitor.isna()]
+        self.data = self.data[~self.data.conc.isna()]
+        
         # remove any leading or trailing spaces
         self.data = self.data.assign(inhibitor = [x.strip() for x in self.data.inhibitor])
 
@@ -324,7 +330,7 @@ class panel:
 
 
 
-    ### DEPRECATED ###
+    ### DEPRECATED ### - not yet
     def avg_plate_replicates(self, method=['within','across'], flag_threshold = 1):
         '''
         A ‘curve-free’ AUC (integration based on fine linear interpolation between
@@ -347,7 +353,7 @@ class panel:
         outputs
             none
         '''
-        warnings.warn('This method is deprecated and will be removed in future release. Use `replicate_QC()`` in the future.')
+        #warnings.warn('This method is deprecated and will be removed in future release. Use `replicate_QC()`` in the future.')
 
         n = 0
 
