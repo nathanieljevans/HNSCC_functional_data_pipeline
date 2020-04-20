@@ -21,7 +21,7 @@ import argparse
 ##############################################################################
 
 REPROCESS = True             # careful with this, all previously processed data will be erased including assay ids.  
-DO_RAISE = False          # raise exceptions in sequential processing job. 
+DO_RAISE = True          # raise exceptions in sequential processing job. 
 
 PLATEMAP_DIR = '../plate_maps/'
 RAW_DATA_DIR = '../data/'

@@ -21,6 +21,8 @@ import shutil
 from sklearn.preprocessing import PolynomialFeatures
 import warnings
 
+from openpyxl import Workbook, load_workbook
+
 def parse_pathname(path, verbose=False, path_sep='/'):
     '''
     parse relevant information from data path, must return
@@ -55,68 +57,6 @@ def parse_pathname(path, verbose=False, path_sep='/'):
 
     return values
 
-# ------------------------------------------------------------------------------
-# deprecated
-def get_plate_data(data_path, verbose=False):
-    '''
-    DEPRECATED
-    each plate has 16 rows of drug data, then a empty row, then the next plate. Varying number of plates
-
-    inputs
-        data_path <str> path to single patient plate data
-
-    outputs
-        dataframe
-    '''
-    print('this method is deprecated, use panel._get_plate_data() in the future')
-
-    lab_id, norm, version_id, notes = parse_pathname(data_path)
-
-    if verbose: print('---------------------------------------------------------')
-    if verbose: print( 'please double check file name parsing is accurate')
-    if verbose: print( 'file name: %s' %data_path.split('/')[-1])
-    if verbose: print('lab_id: %s' %lab_id)
-    if verbose: print('norm: %s' %norm)
-    if verbose: print('version_id: %s' %version_id)
-    if verbose: print('notes: %s' %notes)
-    if verbose: print('---------------------------------------------------------')
-
-    allplates = pd.read_excel(data_path, header=None)
-
-    nplates = (allplates.shape[0] + 1) / 18
-
-    assert nplates%1.0 == 0, 'atypical number of rows, check data format'
-
-    if verbose: print('assay has %d plates' %int(nplates))
-
-    plates = []
-    i = 1 # skip original header
-    warned = False
-    for p in range(int(nplates)):
-        dat = pd.DataFrame( allplates.values[i:(i+16),:])
-
-        # check for blank490 column ... confidence in proper documentation
-        if dat.shape[1] < 26:
-            if not warned: print('WARNING: This assay [lab_id=%s,notes=%s] does not have a "blank490" column (last col), please double check that the data has been normalized by the positive controls.' %(lab_id,notes))
-            warned = True
-            dat = dat.assign(plate_row = dat[0]).assign(norm_type = 'none', plate_num = p+1, lab_id = lab_id, assay_version_id=version_id, note=notes).drop(labels = [0], axis='columns')
-        else:
-            dat = dat.assign(plate_row = dat[0]).assign(norm_type = dat[25], plate_num = p+1, lab_id = lab_id, assay_version_id=version_id, note=notes).drop(labels = [0,25], axis='columns')
-
-        dat = pd.melt(dat, id_vars=['lab_id', 'norm_type', 'plate_num', 'plate_row','assay_version_id', 'note'], value_vars=None, var_name='plate_col', value_name='optical_density', col_level=None)
-
-        plates.append( dat )
-        i += 16 + 2 # skip empty row + header
-
-    # Frame = Frame.append(pandas.DataFrame(data = SomeNewLineOfData), ignore_index=True)
-    df = plates[0]
-    for p in plates[1:]:
-        df = df.append(p, ignore_index=True)
-
-    return df
-
-# ------------------------------------------------------------------------------
-
 def get_plate_map(map_path, verbose=False):
     '''
     get the plate mapping data from the excel plate map
@@ -127,29 +67,74 @@ def get_plate_map(map_path, verbose=False):
     output
         <dataframe> plate mapping data. header = [plate_number, row, col, drug, conc, version_id]
     '''
+    #print('map path:', map_path)
+    book = load_workbook(map_path, data_only=True)    
+    sheets = list(book.sheetnames)
+    sheets.pop(0) # remove 'meta'
+    #print()
+    #print('sheets:', sheets)
+
     meta = pd.read_excel(map_path, header=None, sheet_name='meta')
 
     plate_version = meta[meta[0]=='version_id'].values[0][1]
-    num_sheets = int( meta[meta[0]=='num_plates'][1] )
+    num_sheets = int(len(sheets) / 2)
 
     if verbose: print('plate version id is: %s' %plate_version)
     if verbose: print('There are %d plates in this plate map' %num_sheets)
 
-    map_data = pd.read_excel(map_path, header=0, sheet_name=list(range(1,((num_sheets*2)+1))))
+    #map_data = pd.read_excel(map_path, header=0, sheet_name=list(range(1,((num_sheets*2)+1))))
+
+    #for key in map_data: 
+    #    print('key', key)
+    #    print(map_data[key])
+    #    print(map_data[key].columns)
+    #    print('#########################################################')
 
     plates = []
-    for p in range(num_sheets):
-        plate_num = p+1
-        concs = pd.melt( map_data[p*2+1], id_vars=['row'], var_name='col', value_name='conc')
-        drugs = pd.melt( map_data[p*2+2], id_vars=['row'], var_name='col', value_name='inhibitor')
-        plate_map = concs.merge(drugs, on=['row','col'])
-        plate_map = plate_map.assign(map_version_id = plate_version, plate_number=plate_num)
+    for i,p in enumerate(range(0, num_sheets*2, 2)):
+        #? Really odd behavior with excel: 
+        #! This only started occuring AFTER I implemented the plate_map renaming script. Now, when I read in the values (seems to be just for conc sheets)
+        #! The formula cells are read in as NA, by changing: , na_values = None, keep_default_na = False , we can prevent this for cells, however we 
+        #! still have to rename the header, for some reason it doesn't get handled the same... 
+
+        #! SOLVED: The openpyxl does not evaluate formulas, so when the renaming script saves the new excel plate maps, it has unevaluated equations. 
+        #! to fix this issue, after running the renaming script, you have to open each excel file, go to each tab (should autocalculate) and THEN run this. 
+        #! If you don't do this, it will result in a ton of NA values. 
+
+        #! Solved better: when the renaming script opens the (backup) original platemaps, it loads in ONLY the data. So all equations are lost in downstream versions, however, issue solved. 
+
+        conc_sheet = sheets[p]
+        inhib_sheet = sheets[p+1]
+
+        #print('----')
+        #print('conc', conc_sheet)
+        #print('inhib', inhib_sheet)
+        #print('----')
+
+        conc_raw = pd.read_excel(map_path, header=0, sheet_name=conc_sheet, na_values = None, keep_default_na = False)
+        #conc_raw.rename(columns={o:n for o,n in zip(conc_raw.columns, ['row'] + list(range(1,25)))}, inplace=True)
+        #print(conc_raw)
+        inhib_raw = pd.read_excel(map_path, header=0, sheet_name=inhib_sheet, na_values = None, keep_default_na = False)
+        #inhib_raw.rename(columns={o:n for o,n in zip(inhib_raw.columns, ['row'] + list(range(1,25)))}, inplace=True)
+        #print(inhib_raw)
+
+        concs = pd.melt( conc_raw, id_vars=['row'], var_name='col', value_name='conc')
+        drugs = pd.melt( inhib_raw, id_vars=['row'], var_name='col', value_name='inhibitor')
+
+        plate_map = concs.merge(drugs, on=['row','col'], how='outer')
+        plate_map = plate_map.assign(map_version_id = plate_version, plate_number=i+1)
 
         plates.append(plate_map)
+
+    assert len(plates) == num_sheets, f'should be {num_sheets} plates, but only saw {len(plates)}'
 
     dat = plates[0]
     for p in plates[1:]:
         dat = dat.append(p, ignore_index=True)
+
+    #print('number of concentration NA:', dat.conc.isna().sum())
+    #print('number of inhibitors NA:', dat.inhibitor.isna().sum())
+    assert dat.shape[0] == num_sheets*24*16, f'expected {num_sheets*24*16} non-zero rows from plate-map (based on {num_sheets} plates), but only got {dat.shape[0]} rows.'
 
     return dat
 
@@ -186,10 +171,10 @@ class panel:
 
         self.notes = notes
 
-        self._raw = self._get_plate_data()
+        self.platemap_path = self.platemap_dir + 'HNSCC_plate_map-version_id=' + self.version_id + '.xlsx'
+        self.platemap = get_plate_map(self.platemap_path)
 
-        platemap_path = self.platemap_dir + 'HNSCC_plate_map-version_id=' + self.version_id + '.xlsx'
-        self.platemap = get_plate_map(platemap_path)
+        self._raw = self._get_plate_data()
 
     def _get_plate_data(self):
         '''
@@ -210,6 +195,8 @@ class panel:
         allplates = pd.read_excel(self.plate_path, header=None)
 
         nplates = (allplates.shape[0] + 1) / 18
+
+        #print('>>>>>>>>>>>>>>>>> number of plates (in data):', nplates)
 
         assert nplates%1.0 == 0, 'atypical number of rows, check data format'
 
@@ -240,6 +227,21 @@ class panel:
         for p in plates[1:]:
             df = df.append(p, ignore_index=True)
 
+        '''
+        print('>>>>>>>>>>>>>>>>>>> number of rows in data:', df.shape[0])
+        print(df.head())
+        print('unique rows', df.plate_row.unique())
+        print('unique columns', df.plate_col.unique())
+        print('unique plate numbers:', df.plate_num.unique())
+        print('OD # NA:', df.optical_density.isna().sum())
+
+        print('compare to platemap data')
+        print(self.platemap.head())
+        print('unique rows', self.platemap.row.unique())
+        print('unique columns', self.platemap.col.unique())
+        print('unique plate numbers:', self.platemap.plate_number.unique())
+        '''
+        
         return df
 
     def _log(self, msg):
@@ -255,6 +257,7 @@ class panel:
         '''
 
         self._log('mapping data... [%s]' %self.version_id)
+
         self.data = self._raw.merge(self.platemap, how='left', left_on=['plate_row','plate_col','plate_num'], right_on=['row','col','plate_number']).drop(['row','col','plate_number'], axis='columns')
 
         self.data = self.data[~self.data.inhibitor.isna()]
@@ -276,6 +279,17 @@ class panel:
 
         self.data = self.data.assign(iscomb= [';' in str(conc) for conc in self.data['conc']])
 
+        #! Remove this when done testing
+        '''
+        for i,x in self.data.iterrows(): 
+            try: 
+                np.sqrt(np.sum([float(y)**2 for y in str(x.conc).split(';')]))
+            except: 
+                print('failed')
+                print(x)
+                raise
+        '''
+
         self.data = self.data.assign(conc_norm = [ [np.sqrt(np.sum(float(y)**2 for y in str(x).split(';')))].pop() for x in self.data['conc']])
 
 
@@ -292,7 +306,7 @@ class panel:
 
         # get plate average controls
         PAC = self.data[self.data['inhibitor'] == 'NONE'].groupby(by='plate_num')['optical_density'].mean().to_frame().assign(PAC = lambda x: x.optical_density).drop(['optical_density'], axis='columns')
-
+        
         self._log('plate average controls: \n%s' %str(PAC))
 
         self.data = self.data.merge(PAC, how='left', on='plate_num')
@@ -483,7 +497,7 @@ class panel:
         outputs
             auc <float> area under the curve
         '''
-        assert df.shape[0] == 7, 'There should only be 7 observations per replicate'
+        assert df.shape[0] == 7, f'There should only be 7 observations per replicate, got {df.shape[0]}'
         skip_auc_calc=False
         
         x = [np.log10(x) for x in df['conc_norm'].values]
@@ -717,12 +731,15 @@ class panel:
         self._log('number of assays to fit: %d' %ntofit)
 
         for inhib in set(pat_dat['inhibitor'].values):
+ 
             if i%1==0: print('\t\tFitting regressions...Progress: %.1f%% \t[%d/%d]' %(i/ntofit*100, i, ntofit), end='\t\t\t\t\t\r')
             i+=1
 
             df = pat_dat[pat_dat['inhibitor'] == inhib]
 
-            assert df.shape[0] == 7, 'should have exactly 7 doses! [has %d]' %df.shape[0]
+            #! Why is this hanging??? 
+            #TODO: Go through the across plate replicate averaging and figure this problem out. 
+            #assert df.shape[0] == 7, f"should have exactly 7 doses! [has {df.shape[0]}]\n{df[['lab_id', 'inhibitor', 'cell_viab', 'is_across_plate_repl', 'is_within_plate_repl', 'panel_number']]}"
 
             x = np.log10( df['conc_norm'].values )
             y = df['cell_viab'].values
@@ -732,6 +749,7 @@ class panel:
 
             # fit polynomial for comparison to overfitting
             self.fit_poly(inhib, x, y, poly_res, failures, plot=plot)
+
 
         self._log('Failures [%d]: \n\t%r' %(len(failures),failures))
 
@@ -854,6 +872,16 @@ def process(plate_path, platemap_dir = '../plate_maps/', verbose=False, do_raise
         p = panel(plate_path=plate_path, platemap_dir = platemap_dir, verbose=verbose)
         print('\t\tmapping data...', end='\t\t\t\t\t\r')
         p.map_data()
+
+        print()
+        print('-------------------------------------------------------------------------')
+        print('processing:', p.plate_path)
+        print('total number of rows in data after mapping:', p.data.shape[0])
+        print('number of unique inhibitors:', p.data.inhibitor.unique().shape[0])
+        print('platemap being used:', p.platemap_path)
+        print('-------------------------------------------------------------------------')
+        print()
+
         print('\t\tassigning assay identifier...', end='\t\t\t\t\t\r')
         p.assign_panel_id()
         print('\t\tnormalizing combination agent concentrations...', end='\t\t\t\t\t\r')
