@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Requirements Document</title>
+        
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+        
+        <style>
+.task-list-item { list-style-type: none; } .task-list-item-checkbox { margin-left: -20px; vertical-align: middle; }
+</style>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        
+        
+    </head>
+    <body class="vscode-light">
+        <h1 id="requirements-document">Requirements Document</h1>
+<ul>
+<li><a href="#requirements-document">Requirements Document</a></li>
+<li><a href="#overview">Overview</a>
+<ul>
+<li><a href="#figure-1">Figure 1</a></li>
+</ul>
+</li>
+<li><a href="#1-user-requirements">1. User Requirements</a>
+<ul>
+<li><a href="#11-user-characteristics">1.1 User Characteristics</a></li>
+<li><a href="#13-user-interfaces">1.3 User Interfaces</a></li>
+<li><a href="#14-functional-requirements">1.4 Functional Requirements</a>
+<ul>
+<li><a href="#usrfr1-calculate-the-auc-metric-for-each-patient-inhibitor">USR.FR.1 Calculate the <code>AUC</code> metric for each patient-inhibitor</a></li>
+<li><a href="#usrfr2-provide-normalization-and-data-cleaning-as-described-by-beataml-document-placeholder">USR.FR.2 Provide normalization and data cleaning as described by <code>beatAML-document-placeholder</code></a></li>
+<li><a href="#usrfr3-provide-output-data-in-non-technically-accessible-format">USR.FR.3 Provide output data in non-technically accessible format</a></li>
+</ul>
+</li>
+<li><a href="#non-functional-requirements">Non-Functional Requirements</a>
+<ul>
+<li><a href="#usrnfr1-running-software-should-require-minimal-technical-skills">USR.NFR.1 Running software should require minimal technical skills</a></li>
+<li><a href="#usrnfr2-software-errors-should-prevent-data-output">USR.NFR.2 Software errors should prevent data output</a></li>
+<li><a href="#usrnfr3">USR.NFR.3 ---</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#2-system-requirements">2. System Requirements</a>
+<ul>
+<li><a href="#21-functional-requirements">2.1 Functional Requirements</a>
+<ul>
+<li><a href="#sysfr1-this-software-will-be-implemented-in-python-and-r">SYS.FR.1 This software will be implemented in python and R.</a></li>
+<li><a href="#sysfr2-this-software-must-be-computationally-efficient-and-parrellizable">SYS.FR.2 This software must be computationally efficient and parrellizable</a></li>
+<li><a href="#sysfr3-this-software-must-be-well-annotated-and-accessible-for-maintinience-and-interative-development">SYS.FR.3 This software must be well annotated and accessible for maintinience and interative development</a></li>
+</ul>
+</li>
+<li><a href="#22-non-functional-requirements">2.2 Non-Functional Requirements</a>
+<ul>
+<li><a href="#sysnfr1-this-software-shall-correctly-map-patient-inhbitor-to-functional-response">SYS.NFR.1 This software shall <code>correctly</code> map (patient, inhbitor) to functional response</a></li>
+<li><a href="#sysnfr2-this-software-shall-correctly-calculate-auc-metrics">SYS.NFR.2 This software shall <code>correctly</code> calculate AUC metrics.</a></li>
+<li><a href="#sysnfr3-normalization-methods-should-be-correctly-applied">SYS.NFR.3 Normalization methods should be <code>correctly</code> applied</a></li>
+<li><a href="#sysnfr4-within---across--plate-replicates-should-be-handled-correctly">SYS.NFR.4 Within- &amp; Across- Plate replicates should be handled correctly.</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h1 id="overview">Overview</h1>
+<p>This project outlines the software required to process colorimetric <code>drug response</code> (MTS assays) data. Data generation follows the procedure:</p>
+<ol>
+<li>Patient tumor samples (HNSCC) are obtained from surgery and frozen prior to preparation.</li>
+<li>Samples are unfrozen and cultured in the absence of drug</li>
+<li>Cells are plated (96-well plate) and drugs are applied.</li>
+<li>Cell growth is allowed for ~48 hours</li>
+<li>MTS or MTT colorimetric dyes are added (metabolic dye)</li>
+<li>Optical density is measured (higher values = more cells dead)</li>
+<li>Results are stored as an excel file in a matrix format corresponding to 96-well plate location, where values correspond to optical density.</li>
+</ol>
+<p>The data processing pipeline that this project comprises requires taking the output of the procedure above and mapping the data to long data format that links patient id, inhibitor, and measured optical density. The full data pipeline is outlined in figure 1:</p>
+<h3 id="figure-1">Figure 1</h3>
+<p align="center">
+<img  src="file:///c:\Users\natha\Documents\HNSCC_functional_data_pipeline\figs\pipeline_overview.PNG" >
+</p>
+<p>Each inhibitor-patient assay has functional response measured over 7 concentrations of inhibitor.</p>
+<p>The output of our data pipeline is the <code>AUC</code> metric, which corresponds to patient tumor response to a drug, and is defined as the area under the dose-response curve.</p>
+<p>The ultimate goal of this document is to outline the requirements necessary to develop a robust testing plan to verify and validate the above data pipeline.</p>
+<hr>
+<h1 id="1-user-requirements">1. User Requirements</h1>
+<h2 id="11-user-characteristics">1.1 User Characteristics</h2>
+<p>There are two user groups:</p>
+<ol>
+<li>
+<p>Lab techs / wet-lab team</p>
+<ul>
+<li>These users have limited programming experience</li>
+<li>Interact only with inputs and outputs of the data but may be involved in testing, identifying bugs, and reading the log files for issues.</li>
+</ul>
+</li>
+<li>
+<p>Bioinformaticians</p>
+<ul>
+<li>Highly technical but not necessarily experienced with this package/project.</li>
+<li>Most likely will be involved in an advisory capacity with limited time and effort for code review or bug management</li>
+</ul>
+</li>
+</ol>
+<h2 id="13-user-interfaces">1.3 User Interfaces</h2>
+<p>Users will interact with the data in two formats. The results of the data will be saved to a csv file. This will likely be used in various downstream analysis. Additionally, to facilitate easy visualization, interogation and access there will be a graphical user interface that displays various plots and filtered downloads of the data.</p>
+<h2 id="14-functional-requirements">1.4 Functional Requirements</h2>
+<p>This pipeline was already developed prior to writing this requirements document.</p>
+<h3 id="usrfr1-calculate-the-auc-metric-for-each-patient-inhibitor">USR.FR.1 Calculate the <code>AUC</code> metric for each patient-inhibitor</h3>
+<h3 id="usrfr2-provide-normalization-and-data-cleaning-as-described-by-beataml-document-placeholder">USR.FR.2 Provide normalization and data cleaning as described by <code>beatAML-document-placeholder</code></h3>
+<h3 id="usrfr3-provide-output-data-in-non-technically-accessible-format">USR.FR.3 Provide output data in non-technically accessible format</h3>
+<h2 id="non-functional-requirements">Non-Functional Requirements</h2>
+<h3 id="usrnfr1-running-software-should-require-minimal-technical-skills">USR.NFR.1 Running software should require minimal technical skills</h3>
+<h3 id="usrnfr2-software-errors-should-prevent-data-output">USR.NFR.2 Software errors should prevent data output</h3>
+<p>To avoid non-technical users using faulty output data.</p>
+<h3 id="usrnfr3">USR.NFR.3 ---</h3>
+<hr>
+<h1 id="2-system-requirements">2. System Requirements</h1>
+<h2 id="21-functional-requirements">2.1 Functional Requirements</h2>
+<h3 id="sysfr1-this-software-will-be-implemented-in-python-and-r">SYS.FR.1 This software will be implemented in python and R.</h3>
+<p>Python for the data pipeline. R shiny for data visualization and interaction in a GUI.</p>
+<h3 id="sysfr2-this-software-must-be-computationally-efficient-and-parrellizable">SYS.FR.2 This software must be computationally efficient and parrellizable</h3>
+<p>Assays should be able to process in reasonable time, no slower than 10 seconds per assay. Parrellization, while not necessarily necessary must be optional in order to handle data scaling.</p>
+<h3 id="sysfr3-this-software-must-be-well-annotated-and-accessible-for-maintinience-and-interative-development">SYS.FR.3 This software must be well annotated and accessible for maintinience and interative development</h3>
+<h2 id="22-non-functional-requirements">2.2 Non-Functional Requirements</h2>
+<h3 id="sysnfr1-this-software-shall-correctly-map-patient-inhbitor-to-functional-response">SYS.NFR.1 This software shall <code>correctly</code> map (patient, inhbitor) to functional response</h3>
+<p>The software will accurately convert photospectrometer matrix-format output to long-data format (lab_id, inhibitor, optical_density) using the specified <code>plate_maps</code>.</p>
+<h3 id="sysnfr2-this-software-shall-correctly-calculate-auc-metrics">SYS.NFR.2 This software shall <code>correctly</code> calculate AUC metrics.</h3>
+<p>Area under the dose response curve (AUC) is calculated by integrating a fitted regression (first order, probit regression) the concentration range. AUC values should be deterministic (within minor tolerances) and correctly calculated according to the provided data.</p>
+<h3 id="sysnfr3-normalization-methods-should-be-correctly-applied">SYS.NFR.3 Normalization methods should be <code>correctly</code> applied</h3>
+<p>These are outlined in <code>place-holder-normalization</code></p>
+<h3 id="sysnfr4-within---across--plate-replicates-should-be-handled-correctly">SYS.NFR.4 Within- &amp; Across- Plate replicates should be handled correctly.</h3>
+<p>These are outlined in <code>place-holder-processing</code></p>
+
+    </body>
+    </html>
