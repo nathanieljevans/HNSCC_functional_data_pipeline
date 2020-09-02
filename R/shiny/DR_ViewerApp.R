@@ -7,6 +7,26 @@ library(knitr)
 library(shinyWidgets)
 library(shinythemes)
 
+# TODO's 
+
+# Resources 
+# https://github.com/laderast/burro/blob/master/R/category_single_var.R
+# https://github.com/laderast/partyExplorer/blob/master/app.R
+# https://github.com/laderast/shiny_stuff
+# 
+#  1. Remove atypical predictions / replace with correlation plots for filtering
+#  2. Modularize the ui and server functions - examples of "Shiny Modules" in Hadley Wickams: Mastering Shiny
+#  3. Currently using `NavBarPage`, Ted recommends switching to `FlexDashBoard` -> Scales better 
+#  4. library(rintrojs) <- library for including `tool tips`; clear procedural help/descriptions
+#  5. external review for usability - find someone outside of the lab/project to get advice on usability
+#  6. Hosting: recommends ShinyApps.io. Alternatives: OCTRI, digital ocean droplet
+#  7. plotly: wrapper for ggplot that creates interactive plots - perfect application for curve labels 
+#  8. use color effectively 
+#  9. DT library -> has filter option at right of each variable in data table for more 'excel-like' interaction - good for download page
+# 
+#  a) remove predicted atypical features 
+#  b) add correllation plot table, see EDA ipynb : C:\Users\natha\Box\HNSCC R01 Monthly Meetings\Functional Data OHSU HNSCC Cohort-All Cases\Inhibitor Assays\HNSCC Functional Data Pipeline\EDA
+
 # -------------------------------------------------------------------------------------------------------------------
 ######## GLOBALS ####################################################################################################
 # -------------------------------------------------------------------------------------------------------------------

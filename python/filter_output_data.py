@@ -19,7 +19,7 @@ def QC(assay):
     assay = assay[assay.low_PAC_flag != True]               #? Remove assays with plate average control less than ____
     assay = assay[assay.is_within_plate_repl != True]       #? Remove assays that are aggregated within plate - how to test that this is done correctly?
     assay = assay[assay.is_across_plate_repl != True]       #? Remove assays that have been aggregated across plates - how to test? 
-    assay = assay[assay.across_plate_repl_flag != True]      #! Remove assays that have been aggregated across plates and have a difference greater than 1. 
+    assay = assay[assay.across_plate_repl_flag != True]     #! Remove assays that have been aggregated across plates and have a difference greater than 1. 
     assay = assay[assay.AIC_flag != True]                   #? Remove assays that have AIC value of ____ 
     assay = assay[assay.DEV_flag != True]                   #? Remove assays that have Deviance value of ____ 
     assay = assay[assay.overfit_flag != True]               #? Remove assays that have probit_BIC > poly_BIC
@@ -37,6 +37,9 @@ def QC(assay):
 
 def format_plate_location( assay ): 
     '''
+    specifies the plate location 
+    'panel_id:plate_num:plate_row:plate_col_start-plate_col_end'
+
     '''
     panel = assay['panel_id'].unique()
     plate = assay['plate_num'].unique()
@@ -86,43 +89,82 @@ if __name__ == '__main__':
     print()
     nerr = 0
     cleaned = {'lab_id':[], 'inhibitor':[], 'AUC':[], 'plate_loc':[], 'flagged':[], 'max_conc':[], 'call':[], 'replicates':[]}
+    
+    #! temp 
+    nRep = 0 
+
     for i, inhib in enumerate(inhibitors): 
         inhib_data = data[data.inhibitor == inhib]
         print(f'progress: {100*i/len(inhibitors):.2f}% - processing:   {inhib} \t\t', end='\r')
         for lab_id in lab_ids: 
             try: 
                 assay = inhib_data[inhib_data.lab_id == lab_id]
-                repl = assay.shape[0] / 7
-                assay = QC(assay)
-
-                # TODO: fix all the nans - this is happening in the aggregation step across/within plates I think. 
-                if assay.plate_num.isna().any(): 
-                    continue
-
+                # Not all patients have the same inhibitors (or inhibitors the same patients) and so some will be empty
                 if assay.shape[0] == 0: continue 
 
-                aucs = assay.auc.unique()
-                if len( aucs ) > 1: 
+                repl = assay.shape[0] / 7
 
-                    # TODO: This should have been aggregated earlier in the process - why is it not? 
-                    #print()
-                    #print(f'User Warning - aggregating AUC ({lab_id}, {inhib}); may be an issue in processing pipeline')
-                    #print('AUCS:', aucs)
-                    #print('repls', repl)
-                    #print(assay)
-                    assert len(aucs) == repl, f'There are {repl} replicates but only {len(aucs)} unique auc values'
-                    auc = np.mean(aucs)
+                #! required to get plate locations for aggregated (across/within plate) replicates
+                if repl > 1: 
+                    # Need to specify where the data came from (multiple plates/locations)
+                    repl_ids = assay[['plate_num', 'plate_row', 'panel_id']].drop_duplicates()
+                    agg_assay = None
+                    max_concs = []
+                    plate_loc = []
+                    for _, row in repl_ids.iterrows(): 
+
+                        # separate individual assays; pandas doesn't seem to like selection with nans, hence the if/else
+                        if np.isnan(row.plate_num):
+                            repl = assay[(assay.plate_num.isna()) & (assay.plate_row.isna()) & (assay.panel_id.isna())]
+                        else: 
+                            repl = assay[(assay.plate_num == row.plate_num) & (assay.plate_row == row.plate_row) & (assay.panel_id == row.panel_id)]
+                            
+                        # double check that there are only 7 doses. eg one replicate 
+                        # TODO: Vandetanib has more than one range of conc (max of 5 & 10) and therefore they aren't avg'd 
+                        # TODO: for now we'll ignore these (exlude them) - what to do in the future? 
+                        assert repl.shape[0] == 7, f'expected 7 obs, got {repl.shape[0]} - number of unique doses: {len(repl.conc_norm.unique())}'
+
+                        # don't include the plate location for the agg'd assay (its nan)
+                        if not np.isnan(row.plate_num):
+                            # add all plate locations to plate loc
+                            plate_loc.append( format_plate_location(repl) )
+                            max_concs.append( get_max_conc(repl) )
+
+                        else: 
+                            # select the aggregated assay for use below
+                            agg_assay = repl
+
+                    # check that it got the aggregated assay 
+                    assert agg_assay is not None, "couldn't find the aggregated assay"
+
+                    assay = agg_assay
+                    plate_loc = ':::'.join(plate_loc)
+                    assert len(set(max_concs)) == 1, f'got multiple max concentrations: {set(max_concs)}'
+                    max_conc = max_concs[0]
+
                 else: 
-                    auc = aucs[0]
+                    plate_loc = format_plate_location(assay)
+                    max_conc = get_max_conc(assay) 
 
-                plate_loc = format_plate_location(assay)
+                # filter assays based on QC 
+                assay = QC(assay)
+
+                # QC may remove all assays, in which case don't include in cleaned data
+                if assay.shape[0] == 0: continue 
+
+                # QC could remove just some of the observations... this would be weird but good to have a check
+                assert assay.shape[0] == 7, f'wrong number of observations, expected 7, got {assay.shape[0]}'
+
+                aucs = assay.auc.unique()
+
+                assert len( aucs ) == 1, f'more than one auc for assay; this should have been aggregated across replicates already\ngot: {len(aucs)}\nnumber replicates: {repl}\naucs: {aucs}'
                 
                 cleaned['lab_id'].append( lab_id )
                 cleaned['inhibitor'].append( inhib )
-                cleaned['AUC'].append( auc )
+                cleaned['AUC'].append( aucs[0] )
                 cleaned['plate_loc'].append( plate_loc )
                 cleaned['flagged'].append( assay['manual_flag'].any() )
-                cleaned['max_conc'].append( get_max_conc(assay) )
+                cleaned['max_conc'].append( max_conc )
                 cleaned['call'].append( ' '.join(assay['call'].unique()) )
                 cleaned['replicates'].append( repl )
 
@@ -137,6 +179,7 @@ if __name__ == '__main__':
                 #raise
 
     cleaned = pd.DataFrame(cleaned)
+    print('number replicates aggregated manually (should be zero): ', nRep)
 
     print('\n\n-------------------------------------------------------------------------------------')
     print('After filtering and aggregation...')

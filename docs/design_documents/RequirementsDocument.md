@@ -16,14 +16,14 @@
     - [USR.NFR.3 ---](#usrnfr3)
 - [2. System Requirements](#2-system-requirements)
   - [2.1 Functional Requirements](#21-functional-requirements)
-    - [SYS.FR.1 This software will be implemented in python and R.](#sysfr1-this-software-will-be-implemented-in-python-and-r)
-    - [SYS.FR.2 This software must be computationally efficient and parrellizable](#sysfr2-this-software-must-be-computationally-efficient-and-parrellizable)
-    - [SYS.FR.3 This software must be well annotated and accessible for maintinience and interative development](#sysfr3-this-software-must-be-well-annotated-and-accessible-for-maintinience-and-interative-development)
+    - [SYS.FR.1 This software must be computationally efficient and parrellizable](#sysfr1-this-software-must-be-computationally-efficient-and-parrellizable)
+    - [SYS.FR.2 This software must be well annotated and accessible for maintinience and interative development](#sysfr2-this-software-must-be-well-annotated-and-accessible-for-maintinience-and-interative-development)
   - [2.2 Non-Functional Requirements](#22-non-functional-requirements)
     - [SYS.NFR.1 This software shall `correctly` map (patient, inhbitor) to functional response](#sysnfr1-this-software-shall-correctly-map-patient-inhbitor-to-functional-response)
     - [SYS.NFR.2 This software shall `correctly` calculate AUC metrics.](#sysnfr2-this-software-shall-correctly-calculate-auc-metrics)
     - [SYS.NFR.3 Normalization methods should be `correctly` applied](#sysnfr3-normalization-methods-should-be-correctly-applied)
     - [SYS.NFR.4 Within- & Across- Plate replicates should be handled correctly.](#sysnfr4-within---across--plate-replicates-should-be-handled-correctly)
+    - [SYS.NFR.1 This software will be implemented in python and R.](#sysnfr1-this-software-will-be-implemented-in-python-and-r)
 
 # Overview 
 
@@ -97,15 +97,11 @@ To avoid non-technical users using faulty output data.
 
 ## 2.1 Functional Requirements
 
-### SYS.FR.1 This software will be implemented in python and R. 
-
-Python for the data pipeline. R shiny for data visualization and interaction in a GUI. 
-
-### SYS.FR.2 This software must be computationally efficient and parrellizable 
+### SYS.FR.1 This software must be computationally efficient and parrellizable 
 
 Assays should be able to process in reasonable time, no slower than 10 seconds per assay. Parrellization, while not necessarily necessary must be optional in order to handle data scaling. 
 
-### SYS.FR.3 This software must be well annotated and accessible for maintinience and interative development 
+### SYS.FR.2 This software must be well annotated and accessible for maintinience and interative development 
 
 ## 2.2 Non-Functional Requirements
 
@@ -124,4 +120,8 @@ These are outlined in `place-holder-normalization`
 ### SYS.NFR.4 Within- & Across- Plate replicates should be handled correctly. 
 
 These are outlined in `place-holder-processing` 
+
+### SYS.NFR.1 This software will be implemented in python and R. 
+
+Python for the data pipeline. R shiny for data visualization and interaction in a GUI. 
 
