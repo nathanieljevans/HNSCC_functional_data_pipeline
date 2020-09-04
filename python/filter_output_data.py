@@ -90,9 +90,6 @@ if __name__ == '__main__':
     nerr = 0
     cleaned = {'lab_id':[], 'inhibitor':[], 'AUC':[], 'plate_loc':[], 'flagged':[], 'max_conc':[], 'call':[], 'replicates':[]}
     
-    #! temp 
-    nRep = 0 
-
     for i, inhib in enumerate(inhibitors): 
         inhib_data = data[data.inhibitor == inhib]
         print(f'progress: {100*i/len(inhibitors):.2f}% - processing:   {inhib} \t\t', end='\r')
@@ -102,10 +99,16 @@ if __name__ == '__main__':
                 # Not all patients have the same inhibitors (or inhibitors the same patients) and so some will be empty
                 if assay.shape[0] == 0: continue 
 
-                repl = assay.shape[0] / 7
+                nrepl = assay.shape[0] / 7
+
+                if type(nrepl) != float: 
+                    raise ValueError(f'Replicate count expected float, but got {type(repl)}\nrepl value = {repl}')
 
                 #! required to get plate locations for aggregated (across/within plate) replicates
-                if repl > 1: 
+                if nrepl > 1: 
+                    # number of replicates are inflated by one; aggregated assay isn't true replicate
+                    nrepl -= 1 
+
                     # Need to specify where the data came from (multiple plates/locations)
                     repl_ids = assay[['plate_num', 'plate_row', 'panel_id']].drop_duplicates()
                     agg_assay = None
@@ -166,7 +169,7 @@ if __name__ == '__main__':
                 cleaned['flagged'].append( assay['manual_flag'].any() )
                 cleaned['max_conc'].append( max_conc )
                 cleaned['call'].append( ' '.join(assay['call'].unique()) )
-                cleaned['replicates'].append( repl )
+                cleaned['replicates'].append( nrepl )
 
             except Exception as err: 
                 nerr += 1
@@ -179,7 +182,6 @@ if __name__ == '__main__':
                 #raise
 
     cleaned = pd.DataFrame(cleaned)
-    print('number replicates aggregated manually (should be zero): ', nRep)
 
     print('\n\n-------------------------------------------------------------------------------------')
     print('After filtering and aggregation...')
