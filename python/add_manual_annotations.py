@@ -44,6 +44,8 @@ if __name__ == '__main__':
     if args.verbose: print('output data file path:', args.data_path)
 
     annotations = pd.read_excel(args.annotation_path)
+    annotations = annotations.assign(remove=[x in [1,'1','true','True','TRUE','y','yes','Y','YES'] for x in annotations.remove])
+    
     data = pd.read_csv(args.data_path, low_memory=False)
     assayids = pd.read_csv(args.assayid_path, sep=' : ',header=None, engine='python')
 
